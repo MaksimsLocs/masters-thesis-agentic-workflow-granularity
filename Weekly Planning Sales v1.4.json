@@ -1,0 +1,569 @@
+{
+  "name": "Weekly Planning Sales v1.4",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 0 8 * * 5"
+            },
+            {}
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        -11984,
+        9376
+      ],
+      "id": "f68ce88f-2308-4ba0-a2da-989f38688253",
+      "name": "Schedule Trigger"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Helper function to format date as YYYY-MM-DD in Riga timezone\nfunction formatDate(date) {\n  return date.toLocaleString('sv-SE', {\n    timeZone: 'Europe/Riga',\n    day: '2-digit',\n    month: '2-digit',\n    year: 'numeric',\n  }).split(' ')[0];\n}\n\n// Get current date in Riga timezone\nconst now = new Date(new Date().toLocaleString('en-US', { timeZone: 'Europe/Riga' }));\n\n// Find next Monday\nconst currentDay = now.getDay(); // 0 (Sun) to 6 (Sat)\nconst daysUntilNextMonday = ((8 - currentDay) % 7) || 7;\nconst nextMonday = new Date(now);\nnextMonday.setDate(now.getDate() + daysUntilNextMonday);\n\n// Next Friday after the found Monday\nconst nextFriday = new Date(nextMonday);\nnextFriday.setDate(nextMonday.getDate() + 4);\n\nreturn [{\n  nextMon: formatDate(nextMonday),\n  nextFri: formatDate(nextFriday)\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -11584,
+        9376
+      ],
+      "id": "fa0181ae-996b-4bf4-a714-5b211816bfaa",
+      "name": "Next Monday -> Next Friday"
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "value": "gpt-5-nano-2025-08-07",
+          "mode": "list",
+          "cachedResultName": "gpt-5-nano-2025-08-07"
+        },
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.2,
+      "position": [
+        -9968,
+        9984
+      ],
+      "id": "76446e1c-423b-4d8c-8ba4-791adb73ad23",
+      "name": "OpenAI Chat Model"
+    },
+    {
+      "parameters": {
+        "toRecipients": "=",
+        "subject": "=To do tasks (Time period: {{ $('Next Monday -> Next Friday').item.json.nextMon }} - {{ $('Next Monday -> Next Friday').item.json.nextFri }})",
+        "bodyContent": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('Message', ``, 'string') }}",
+        "additionalFields": {
+          "bodyContentType": "html"
+        }
+      },
+      "type": "n8n-nodes-base.microsoftOutlookTool",
+      "typeVersion": 2,
+      "position": [
+        -9616,
+        9984
+      ],
+      "id": "3179e4ec-1f45-4a32-af7e-72f1e4acc96a",
+      "name": "send_email",
+      "webhookId": "f63b8394-0581-49cc-9155-2243c589dfc3",
+      "credentials": {
+        "microsoftOutlookOAuth2Api": {
+          "id": "2zMiILm1BsBP2NdN",
+          "name": "Microsoft Outlook account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "fieldToSplitOut": "data",
+        "include": "selectedOtherFields",
+        "fieldsToInclude": "name, status, date, allocated_to, description",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.splitOut",
+      "typeVersion": 1,
+      "position": [
+        -10240,
+        9040
+      ],
+      "id": "4d72d06a-7f8e-40b3-907b-a5a02c23fa1c",
+      "name": "Split Out"
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        -10016,
+        9040
+      ],
+      "id": "d9fa3af5-f8bd-4280-8f02-4a673e173816",
+      "name": "Loop Over Items"
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "mode": "list",
+          "value": "gpt-4.1-mini"
+        },
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.2,
+      "position": [
+        -9520,
+        9408
+      ],
+      "id": "b8664f7d-7af5-470d-beff-9253c6354018",
+      "name": "OpenAI Chat Model1"
+    },
+    {
+      "parameters": {
+        "jsonSchemaExample": "{\n\t\"title\": \"Meeting with Sydesol - https://erpnext.biss.lv/app/todo/0lbht1i143\"\n\t\n}"
+      },
+      "type": "@n8n/n8n-nodes-langchain.outputParserStructured",
+      "typeVersion": 1.3,
+      "position": [
+        -9248,
+        9408
+      ],
+      "id": "f598418c-60ba-4256-87c6-2779871b9601",
+      "name": "Structured Output Parser"
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        -9024,
+        9072
+      ],
+      "id": "e7603b79-2ce3-44c2-8bda-69f401a32b6d",
+      "name": "Merge"
+    },
+    {
+      "parameters": {
+        "resource": "event",
+        "operation": "create",
+        "calendarId": {
+          "__rl": true,
+          "value": "AQMkADE4MWMwMjNmLWE3MGItNGE3Yi05MGQ3LTRlZjNlNTI3YzdiYwBGAAADH-465xBQvU_E32qZzpGSrAcAGSmuAt839EWeL23iy1n0rQAAAgEGAAAAGSmuAt839EWeL23iy1n0rQAAAp-OAAAA",
+          "mode": "list",
+          "cachedResultName": "Calendar"
+        },
+        "subject": "={{ $json.title }}",
+        "startDateTime": "={{ $json.start }}",
+        "endDateTime": "={{ $json.end }}",
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.microsoftOutlook",
+      "typeVersion": 2,
+      "position": [
+        -8448,
+        9072
+      ],
+      "id": "ee648cf3-a0e9-41e4-ab48-83193e2a2dde",
+      "name": "Create an event",
+      "webhookId": "f2122469-acfe-40ce-a215-b1908e9532fc"
+    },
+    {
+      "parameters": {
+        "amount": 1
+      },
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        -8176,
+        9072
+      ],
+      "id": "cc16699a-e71e-45c7-8a73-90327ac29e9f",
+      "name": "Wait",
+      "webhookId": "ced64d75-ffa6-4aaf-bc7d-153a7c448fad"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=name: {{ $json.data.name }}\ndescription_clean: {{ $json.data.description_clean }}",
+        "hasOutputParser": true,
+        "options": {
+          "systemMessage": "Return a short, human-readable title from the provided sanitized text. \nRules: ≤ 8 words.\nIf text is empty, use a generic action like \"Follow up task\".\nadd to the title \"- https://erpnext.biss.lv/app/todo/<name>\"\nRespond ONLY as JSON matching the required schema.\n\nReturn a short, human-readable title from the provided sanitized text.\nRules: ≤ 8 words.\nIf text is empty, use a generic action like \"Follow up task\".\nadd to the title \"- https://erpnext.biss.lv/app/todo/<name>\"\nRespond ONLY as JSON matching the required schema."
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 2,
+      "position": [
+        -9456,
+        9120
+      ],
+      "id": "b8076609-2cb2-49ee-ba19-21babe5f4c78",
+      "name": "AI Title Generator"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ JSON.stringify($json) }}\n",
+        "options": {
+          "systemMessage": "=ROLE\nYou are WeekPlannerBot. You will receive ONE JSON object for a single salesperson’s next-week tasks:\n\nINPUT SHAPE\n{\n  \"weekTotal\": number,\n  \"days\": [\n    {\n      \"label\": \"Monday\" | \"Tuesday\" | \"Wednesday\" | \"Thursday\" | \"Friday\",\n      \"date\": \"YYYY-MM-DD\",\n      \"total\": number,\n      \"items\": [\n        { \"n\": number, \"name\": \"TODO-ID\", \"priority\": \"High|Medium|Low\", \"desc\": \"plain text\" }\n      ]\n    }\n  ]\n}\n\nTOOLS\nsend_email\n  • message : string   // HTML body only; To & Subject are set in the node\n\nTASK\nCompose ONE HTML email using the provided counts and indices exactly as given.\n\nFor EACH item:\n- Create a **TITLE** from item.desc:\n  • 4–8 words, plain text, sentence case.\n  • No trailing punctuation, no quotes, no emojis.\n  • Prefer action + object (e.g., “Prepare pricing proposal”, “Schedule site survey”).\n  • Do NOT copy item.desc verbatim; generate a concise title.\n  • If desc is empty, use “Follow up task”.\n\nEmail structure (simple Outlook-safe HTML, minimal inline styles):\n\n1) Weekly total (first line):\n   <p><strong>Total open tasks this week: [weekTotal]</strong></p>\n\n2) For each day in the given order (days[0]..days[4]):\n   • Day header using the ISO date reformatted to “MonthName DD, YYYY”:\n     <h3 style=\"margin:0 0 6px 0;\">[label], [MonthName from date] [DD], [YYYY] — [total] tasks</h3>\n\n   • If total == 0:\n     <p>— no tasks —</p>\n\n   • If total > 0:\n     <ol start=\"1\" style=\"margin:0 0 14px 22px; padding:0;\">\n       For each item in ascending order by item.n, add:\n       <li style=\"margin:0 0 4px 0;\">\n         [TITLE] — [ [priority] ] —\n         <a href=\"https://erpnext.biss.lv/app/todo/[name]\">open</a>\n       </li>\n     </ol>\n\n   • Add a thin spacer after each day block:\n     <div style=\"height:8px;\"></div>\n\nCONSTRAINTS\n• Use weekTotal and each day.total exactly as provided; do not recalculate.\n• Preserve item order by their n field; do not renumber.\n• Produce exactly ONE tool call: send_email with the complete HTML body in the message field.\n• Output only a single tool invocation; no extra prose or markdown.\n\nOUTPUT\nReturn a single-element JSON array\n]\n\n",
+          "maxIterations": 3
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 2,
+      "position": [
+        -9904,
+        9696
+      ],
+      "id": "2097fd80-ae8d-44ca-84d6-d892c5091d92",
+      "name": "AI E-mail Sender",
+      "retryOnFail": true
+    },
+    {
+      "parameters": {
+        "jsCode": "// Helpers\nconst strip = s => (s || '').replace(/<[^>]*>/g, ' ').replace(/\\s+/g, ' ').trim();\nconst fmt = d => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;\n\n// Input (KEEP name)\nconst tasks = ($json.data || []).map(t => ({\n  name: t.name,                // <-- needed for link\n  date: t.date,\n  priority: t.priority,\n  desc: strip(t.description).slice(0, 200)\n}));\n\nif (!tasks.length) return [{ json: { weekTotal: 0, days: [] } }];\n\n// Find Monday of that week\nconst minDateStr = tasks.map(t => t.date).sort()[0];\nconst base = new Date(`${minDateStr}T00:00:00`);\nconst dow = base.getDay();                 // 0 Sun..6 Sat\nbase.setDate(base.getDate() - ((dow + 6) % 7));\n\n// Build Mon→Fri skeleton\n/** @type {{label:string,date:string,total:number,items:Array<any>}[]} */\nconst days = ['Monday','Tuesday','Wednesday','Thursday','Friday'].map((label, i) => {\n  const d = new Date(base); d.setDate(base.getDate() + i);\n  return { label, date: fmt(d), total: 0, items: /** @type {any[]} */([]) };\n});\n\n// Group + pre-number\nfor (const t of tasks) {\n  const bucket = days.find(x => x.date === t.date);\n  if (!bucket) continue;\n  const n = bucket.items.length + 1;\n  bucket.items.push({\n    n,                    // numbering to print\n    name: t.name,         // <-- keep name\n    priority: t.priority,\n    desc: t.desc\n  });\n  bucket.total++;\n}\n\nreturn [{ json: { weekTotal: tasks.length, days } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -10256,
+        9584
+      ],
+      "id": "7fc61841-8f95-4ca5-a679-5fcae52c15df",
+      "name": "Calculate Total Events + Normalize Data"
+    },
+    {
+      "parameters": {
+        "jsCode": "const strip = s => (s ?? '').replace(/<[^>]*>/g, ' ').replace(/\\s+/g, ' ').trim();\n\nconst d = $json.data || {};\nconst clean = strip(d.description).slice(0, 200);\n\nreturn [{\n  json: {\n    ...$json,\n    data: { ...d, description_clean: clean }\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -9760,
+        9056
+      ],
+      "id": "6bf74fb7-741a-4e50-a533-dbe2c7d9e371",
+      "name": "Clean HTML from Description"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Combine item 0 (data) and item 1 (output)\nconst arr = $items().map(i => i.json);\nconst task = (arr.find(i => i.data) || {}).data || {};\nlet out = (arr.find(i => i.output) || {}).output;\n\nif (typeof out === 'string') { \n  try { \n    out = JSON.parse(out); \n  } catch {} \n}\n\n// Define slots + one fallback\nconst slots = [\n  { start: \"03:00\", end: \"03:15\" },  // 25%\n  { start: \"03:30\", end: \"03:45\" },  // 25%\n  { start: \"04:00\", end: \"04:15\" },  // 25%\n  { start: \"04:30\", end: \"04:45\" }   // 25% (extra/fallback)\n];\n\n// Pick one slot with equal 25% chance\nconst slot = slots[Math.floor(Math.random() * slots.length)];\n\nreturn [{\n  title: String(out?.title || '').trim(),\n  start: `${task.date}T${slot.start}`,\n  end:   `${task.date}T${slot.end}`\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -8736,
+        9072
+      ],
+      "id": "12c29a15-8ac4-42db-91d6-7db1b3fd1f43",
+      "name": "Prepare Event Data for Outlook"
+    },
+    {
+      "parameters": {
+        "aggregate": "aggregateAllItemData",
+        "include": "specifiedFields",
+        "fieldsToInclude": "name, status, priority, date, allocated_to, description",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.aggregate",
+      "typeVersion": 1,
+      "position": [
+        -10528,
+        9376
+      ],
+      "id": "a17c70e8-3c27-4659-849e-a0f64c0e7761",
+      "name": "Aggregate ToDo Tasks"
+    },
+    {
+      "parameters": {
+        "operation": "getAll",
+        "docType": "={{ 'ToDo' }}",
+        "returnAll": true,
+        "options": {
+          "filters": {
+            "customProperty": [
+              {
+                "field": "=status",
+                "value": "Open"
+              },
+              {
+                "field": "=allocated_to"
+              },
+              {
+                "field": "=date",
+                "operator": "equalsGreater",
+                "value": "={{ $json.nextMon }}"
+              },
+              {
+                "field": "=date",
+                "operator": "equalsLess",
+                "value": "={{ $json.nextFri }}"
+              }
+            ]
+          }
+        }
+      },
+      "type": "n8n-nodes-base.erpNext",
+      "typeVersion": 1,
+      "position": [
+        -11216,
+        9376
+      ],
+      "id": "a06d44c6-618f-4985-82c5-5efce19025fc",
+      "name": "Get All ToDo Tasks Next Week",
+      "credentials": {
+        "erpNextApi": {
+          "id": "FKYgfWUfBEaUBaF5",
+          "name": "ERPNext BISS"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "docType": "={{ 'ToDo' }}",
+        "documentName": "={{ $json.name }}"
+      },
+      "type": "n8n-nodes-base.erpNext",
+      "typeVersion": 1,
+      "position": [
+        -10864,
+        9376
+      ],
+      "id": "0cee3d01-3d6e-4a13-9835-03a032742041",
+      "name": "Gather ToDo Task Information"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Schedule Trigger": {
+      "main": [
+        [
+          {
+            "node": "Next Monday -> Next Friday",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Next Monday -> Next Friday": {
+      "main": [
+        [
+          {
+            "node": "Get All ToDo Tasks Next Week",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI E-mail Sender",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "send_email": {
+      "ai_tool": [
+        [
+          {
+            "node": "AI E-mail Sender",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split Out": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Loop Over Items": {
+      "main": [
+        [],
+        [
+          {
+            "node": "Clean HTML from Description",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI Chat Model1": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Title Generator",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Structured Output Parser": {
+      "ai_outputParser": [
+        [
+          {
+            "node": "AI Title Generator",
+            "type": "ai_outputParser",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge": {
+      "main": [
+        [
+          {
+            "node": "Prepare Event Data for Outlook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create an event": {
+      "main": [
+        [
+          {
+            "node": "Wait",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Title Generator": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Calculate Total Events + Normalize Data": {
+      "main": [
+        [
+          {
+            "node": "AI E-mail Sender",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Clean HTML from Description": {
+      "main": [
+        [
+          {
+            "node": "AI Title Generator",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Event Data for Outlook": {
+      "main": [
+        [
+          {
+            "node": "Create an event",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Aggregate ToDo Tasks": {
+      "main": [
+        [
+          {
+            "node": "Calculate Total Events + Normalize Data",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Split Out",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get All ToDo Tasks Next Week": {
+      "main": [
+        [
+          {
+            "node": "Gather ToDo Task Information",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gather ToDo Task Information": {
+      "main": [
+        [
+          {
+            "node": "Aggregate ToDo Tasks",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false
+  },
+  "versionId": "e687d368-9aab-4794-992a-3556584330bf",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "70105cd159f1712be91b4c81e323ebe864d2013780db89b2c3ff3da04adb16fe"
+  },
+  "id": "LfAyQwTanU5pBASh",
+  "tags": []
+}

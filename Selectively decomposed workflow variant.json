@@ -1,0 +1,1335 @@
+{
+  "name": "Selectively decomposed workflow variant",
+  "nodes": [
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        -1664,
+        1200
+      ],
+      "id": "c3af40be-373a-4b8f-8791-4e083f3ce9ea",
+      "name": "When clicking ‘Execute workflow’"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "87f3deb0-c3a8-4eab-900f-d611c5ede4d8",
+              "name": "graphqlUrl",
+              "value": "",
+              "type": "string"
+            },
+            {
+              "id": "07507846-acd4-452e-a16f-3efe73c3a3ac",
+              "name": "email",
+              "value": "",
+              "type": "string"
+            },
+            {
+              "id": "e2311484-015e-49bd-bbd3-a175897718c8",
+              "name": "password",
+              "value": "",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -1456,
+        1200
+      ],
+      "id": "000c18a9-32be-4881-9c9f-1fa81d2d493d",
+      "name": "Set Config"
+    },
+    {
+      "parameters": {
+        "endpoint": "={{ $('Set Config').item.json.graphqlUrl }}",
+        "query": "=mutation Login($email: String!, $password: String!) {\n    login(input: {\n      email: $email\n      password: $password\n    }) {\n      accessToken,\n      refreshToken\n    }\n  }",
+        "variables": "={\n    \"email\": \"{{ $json.email }}\",\n    \"password\": \"{{ $json.password }}\"\n  }",
+        "operationName": "Login"
+      },
+      "type": "n8n-nodes-base.graphql",
+      "typeVersion": 1.1,
+      "position": [
+        -1216,
+        1200
+      ],
+      "id": "ad390577-0ba9-460b-905a-733a392d43e8",
+      "name": "Login"
+    },
+    {
+      "parameters": {
+        "endpoint": "={{ $('Set Config').item.json.graphqlUrl }}",
+        "query": "=mutation Login($refreshToken: String!) {\n  refreshToken(refreshToken: $refreshToken) {\n    accessToken\n    refreshToken\n  }\n}",
+        "variables": "={\n  \"refreshToken\": \"{{ $json.data.login.refreshToken }}\"\n}",
+        "operationName": "Login"
+      },
+      "type": "n8n-nodes-base.graphql",
+      "typeVersion": 1.1,
+      "position": [
+        -976,
+        1200
+      ],
+      "id": "107a68ed-7ac0-487b-87d8-ff810d29e5e4",
+      "name": "Refresh Token"
+    },
+    {
+      "parameters": {
+        "endpoint": "={{ $('Set Config').item.json.graphqlUrl }}",
+        "query": "query ListParkingEvents($filter: ParkingEventFilter!, $sorting: [ParkingEventSort!], $paging: Paging!) {\n  parkingEvents(filter: $filter, sorting: $sorting, paging: $paging) {\n    nodes {\n      id\n      locationId\n      vehicleId\n      licencePlateNumber\n      licencePlateNumberInitial\n      licencePlateNumberAi\n      kind\n      kindInitial\n      time\n      cameraId\n      cameraConfidenceScore\n      vehicleMake\n      vehicleModel\n      vehicleCategory\n      vehicleColor\n      createdAt\n      reviewStatus\n      reviewStatusInitial\n      session {\n        id\n        status\n      }\n      location {\n        name\n      }\n      vehicle {\n        id\n        licencePlateNumber\n      }\n    }\n    pageInfo {\n      hasPreviousPage\n      hasNextPage\n      startCursor\n      endCursor\n    }\n    totalCount\n  }\n}",
+        "variables": "{\"filter\": {\n      \"licencePlateNumber\": { \"eq\": \"n.a.\" },\n      \"reviewStatus\": { \"eq\": \"PENDING\" },\n  \"location\": {\"eq\": \"019d0168-4dae-79a1-b1bc-f1863c57deb2\" }\n    },\n\"sorting\": [{ \"field\": \"time\", \"direction\": \"DESC\" }],\n    \"paging\": { \"limit\": 40, \"offset\": 0 }\n}",
+        "operationName": "ListParkingEvents",
+        "headerParametersUi": {
+          "parameter": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $json.data.refreshToken.accessToken }}"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.graphql",
+      "typeVersion": 1.1,
+      "position": [
+        -768,
+        1200
+      ],
+      "id": "91af2a54-ae3e-4165-8232-267a4f54ed70",
+      "name": "Get all n.a.'s"
+    },
+    {
+      "parameters": {
+        "jsCode": "const nodes = $json.data?.parkingEvents?.nodes ?? [];\nreturn nodes.map(n => ({ json: n }));"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -592,
+        1200
+      ],
+      "id": "7b4bcd47-109b-4b02-8ea3-4bc4ce6a23cd",
+      "name": "Split"
+    },
+    {
+      "parameters": {
+        "url": "={{ $('Picture URL').item.json.pictureUrl }}",
+        "options": {
+          "response": {
+            "response": {
+              "neverError": true,
+              "responseFormat": "file",
+              "outputPropertyName": "image"
+            }
+          }
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        48,
+        912
+      ],
+      "id": "38e9a1ee-59d8-43a6-aef2-e6d1019fbd8e",
+      "name": "HTTP Request"
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "combineBy": "combineByPosition",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        224,
+        1072
+      ],
+      "id": "654b4bfa-58c2-4418-86c7-0237d2e88842",
+      "name": "Merge"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const W = $json.size?.width;\nconst H = $json.size?.height;\nif (!W || !H) throw new Error(\"Missing size.width/size.height\");\n\nconst b = $json.output?.bbox;\nif (!b) throw new Error(\"Missing output.bbox\");\n\nlet { x, y, w, h } = b;\nconst bboxConfidence = Number($json.output?.bboxConfidence || 0);\n\n// normalize if agent ever returns percent\nif (x > 1 || y > 1 || w > 1 || h > 1) {\n  x /= 100;\n  y /= 100;\n  w /= 100;\n  h /= 100;\n}\n\n// Bigger, asymmetric padding\n// More width, a bit more bottom margin, because plate is often near lower front/rear area\nlet padX = 0.18;\nlet padTop = 0.12;\nlet padBottom = 0.26;\n\n// If detector is less confident, expand more\nif (bboxConfidence < 0.85) {\n  padX += 0.06;\n  padTop += 0.04;\n  padBottom += 0.08;\n}\n\n// Expand bbox\nlet x1 = Math.max(0, x - w * padX);\nlet y1 = Math.max(0, y - h * padTop);\nlet x2 = Math.min(1, x + w + w * padX);\nlet y2 = Math.min(1, y + h + h * padBottom);\n\n// Convert to pixels\nlet cropX = Math.max(0, Math.floor(x1 * W));\nlet cropY = Math.max(0, Math.floor(y1 * H));\nlet cropW = Math.max(1, Math.ceil((x2 - x1) * W));\nlet cropH = Math.max(1, Math.ceil((y2 - y1) * H));\n\n// Enforce minimum crop size so tiny detections do not cut off the plate\nconst minCropW = Math.max(1, Math.round(W * 0.18));\nconst minCropH = Math.max(1, Math.round(H * 0.12));\n\nif (cropW < minCropW) {\n  const centerX = cropX + cropW / 2;\n  cropW = minCropW;\n  cropX = Math.max(0, Math.round(centerX - cropW / 2));\n}\n\nif (cropH < minCropH) {\n  const centerY = cropY + cropH / 2;\n  cropH = minCropH;\n  cropY = Math.max(0, Math.round(centerY - cropH / 2));\n}\n\n// Clamp to image bounds\nif (cropX + cropW > W) cropX = Math.max(0, W - cropW);\nif (cropY + cropH > H) cropY = Math.max(0, H - cropH);\nif (cropX + cropW > W) cropW = W - cropX;\nif (cropY + cropH > H) cropH = H - cropY;\n\nreturn {\n  json: {\n    ...$json,\n    crop: {\n      x: cropX,\n      y: cropY,\n      w: cropW,\n      h: cropH\n    }\n  },\n  binary: $binary\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        704,
+        1072
+      ],
+      "id": "70e227c0-eeca-4e80-95f2-8b49c894d9b2",
+      "name": "Compute Cropped Image"
+    },
+    {
+      "parameters": {
+        "operation": "crop",
+        "dataPropertyName": "image",
+        "width": "={{ $json.crop.w }}",
+        "height": "={{ $json.crop.h }}",
+        "positionX": "={{ $json.crop.x }}",
+        "positionY": "={{ $json.crop.y }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.editImage",
+      "typeVersion": 1,
+      "position": [
+        1088,
+        1056
+      ],
+      "id": "8370bdbf-ed09-4ed1-b795-94c496156d8f",
+      "name": "Crop Image"
+    },
+    {
+      "parameters": {
+        "jsCode": "for (const item of items) {\n  const b = item.binary?.image;  // must match Binary Property name\n  if (!b) throw new Error('No binary.image found');\n  b.mimeType = 'image/jpeg';\n  b.fileExtension = 'jpg';\n}\nreturn items;\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        160,
+        768
+      ],
+      "id": "d0daba7b-f5ff-416b-8a98-4f5d75207034",
+      "name": "Read Image"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Build S3 image URL from the current event id\nconst base = 'https://flomo-test.s3.eu-north-1.amazonaws.com';\n\nreturn items.map(item => ({\n  json: {\n    ...item.json,\n    pictureUrl: `${base}/${item.json.id}.jpg`\n  },\n  binary: item.binary\n}));"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -336,
+        912
+      ],
+      "id": "0aeabdf5-6391-491f-a7ac-b2364637cf20",
+      "name": "Picture URL"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Keeps ONLY what crop computation needs: size + parsed bbox (from the current item).\n// No binary output.\n\nfunction extractOutputText(resp) {\n  for (const entry of (resp.output || [])) {\n    if (entry.type === \"message\") {\n      for (const p of (entry.content || [])) {\n        if (p.type === \"output_text\" && typeof p.text === \"string\") return p.text;\n      }\n    }\n  }\n  return null;\n}\n\nreturn items.map((item) => {\n  const resp = item.json;\n\n  // 1) read bbox text from THIS response\n  const text = extractOutputText(resp);\n  if (!text) {\n    throw new Error(\"No output_text found in OpenAI response. Check resp.output[*].content[*].type.\");\n  }\n\n  const parsed = JSON.parse(text); // { vehicleVisible, bboxConfidence, bbox:{x,y,w,h} }\n\n  // 2) read size from THIS item (must be present via Merge or stored earlier)\n  const W = resp.size?.width;\n  const H = resp.size?.height;\n\n  if (!W || !H) {\n    throw new Error(\"Missing resp.size.width/height on this item. Merge Get Information output into the OpenAI response item.\");\n  }\n\n  // 3) return proper n8n item\n  return {\n    json: {\n      size: { width: W, height: H },\n      output: parsed\n    }\n  };\n});"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        512,
+        1072
+      ],
+      "id": "a23e0286-a86c-4e59-a58c-45c41fb25a5a",
+      "name": "Remove Unnecessary Fields"
+    },
+    {
+      "parameters": {
+        "operation": "information",
+        "dataPropertyName": "image"
+      },
+      "type": "n8n-nodes-base.editImage",
+      "typeVersion": 1,
+      "position": [
+        336,
+        880
+      ],
+      "id": "9a68fb79-f1e3-4cea-b37c-6cdffe1f045b",
+      "name": "Get Image1",
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "combineBy": "combineByPosition",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        912,
+        1056
+      ],
+      "id": "dcd005b5-2154-484a-b4eb-49af9e516bf2",
+      "name": "Merge1"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.openai.com/v1/responses",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "openAiApi",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $json.openaiBody }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        1856,
+        1056
+      ],
+      "id": "57f258dd-41f2-4344-87a0-d59682a65d3d",
+      "name": "LPN Review",
+      "credentials": {
+        "openAiApi": {
+          "id": "DGMKhtjWiud3t6nI",
+          "name": "GPT_Credentials"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "function extractOutputText(resp) {\n  for (const entry of (resp.output || [])) {\n    if (entry.type === \"message\") {\n      for (const part of (entry.content || [])) {\n        if (part.type === \"output_text\" && typeof part.text === \"string\") {\n          return part.text;\n        }\n      }\n    }\n  }\n  return null;\n}\n\nconst sourceItems = $('Init Test Metrics').all();\n\nreturn $input.all().map((item, idx) => {\n  const text = extractOutputText(item.json);\n  if (!text) throw new Error(\"No output_text found in HTTP response\");\n\n  const parsed = JSON.parse(text);\n\n  return {\n    json: {\n      eventId: sourceItems[idx]?.json.eventId ?? sourceItems[idx]?.json.id ?? null,\n      ...parsed\n    }\n  };\n});"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2064,
+        1056
+      ],
+      "id": "4626ea86-3155-4109-a40a-3755221cc447",
+      "name": "LPN Result"
+    },
+    {
+      "parameters": {
+        "jsCode": "function normalizePlate(p) {\n  const raw = String(p || '').trim().toUpperCase();\n\n  if (!raw) return '';\n\n  const compact = raw\n    .replace(/[\\s\\-\\/\\\\]/g, '')\n    .replace(/[^A-Z0-9%]/g, '');\n\n  if (['NA', 'N/A', 'N.A', 'N.A.'].includes(raw) || compact === 'NA') {\n    return 'N.A.';\n  }\n\n  return compact;\n}\n\nconst allItems = $input.all();\nconst output = [];\n\nfor (const item of allItems) {\n  const candidates = Array.isArray(item.json.candidates) ? item.json.candidates : [];\n\n  // Debug passthrough so you can see why it failed\n  if (candidates.length === 0) {\n    output.push({\n      json: {\n        eventId: item.json.eventId ?? item.json.id ?? null,\n        debug: true,\n        error: 'No candidates array found for Normalize',\n        inputKeys: Object.keys(item.json),\n        inputPreview: item.json\n      }\n    });\n    continue;\n  }\n\n  const seen = new Set();\n\n  for (let idx = 0; idx < candidates.length; idx++) {\n    const c = candidates[idx];\n    const conf = Number(c.overallConf || 0);\n\n    if (conf < 0.5) {\n      output.push({\n        json: {\n          eventId: item.json.eventId ?? item.json.id ?? null,\n          rank: idx + 1,\n          plateRaw: c.plate || '',\n          plateNormalized: 'N.A.',\n          overallConf: conf,\n          charConf: Array.isArray(c.charConf) ? c.charConf : [],\n          notes: c.notes || '',\n          hasWildcard: false,\n          belowConfidenceThreshold: true\n        }\n      });\n      continue;\n    }\n\n    const plateNormalized = normalizePlate(c.plate);\n\n    if (!plateNormalized) continue;\n    if (seen.has(plateNormalized)) continue;\n    seen.add(plateNormalized);\n\n    output.push({\n      json: {\n        eventId: item.json.eventId ?? item.json.id ?? null,\n        rank: idx + 1,\n        plateRaw: c.plate || '',\n        plateNormalized,\n        overallConf: conf,\n        charConf: Array.isArray(c.charConf) ? c.charConf : [],\n        notes: c.notes || '',\n        hasWildcard: plateNormalized.includes('%'),\n        belowConfidenceThreshold: false\n      }\n    });\n  }\n}\n\nreturn output;"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2480,
+        1056
+      ],
+      "id": "956b7022-2a95-4f33-8a80-7e00524a9638",
+      "name": "Normalize"
+    },
+    {
+      "parameters": {
+        "options": {
+          "reset": false
+        }
+      },
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        1328,
+        1376
+      ],
+      "id": "ea6a00b5-2382-40a7-93e3-80d3c84fcf6b",
+      "name": "Loop Over Items1"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "b3db19ca-e811-42e7-96cd-02fd87e8803d",
+              "leftValue": "={{ $json.hasWildcard }}",
+              "rightValue": false,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        1456,
+        1504
+      ],
+      "id": "7357dad0-0656-4389-94c9-2ccd5505d673",
+      "name": "If Wildcard"
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "dataTableId": {
+          "__rl": true,
+          "value": "p5Imd0Fndup1bhLE",
+          "mode": "list",
+          "cachedResultName": "events",
+          "cachedResultUrl": "/projects/RMVda2C0F3gwCTVn/datatables/p5Imd0Fndup1bhLE"
+        },
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "plate",
+              "keyValue": "={{ $json.plateNormalized }}"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        1680,
+        1600
+      ],
+      "id": "86ace665-044d-42bf-9a00-a91b3218ee40",
+      "name": "Cross-reference DB",
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "c2de2f11-1188-4426-985e-6775ec0fc520",
+              "name": "plate",
+              "value": "={{ $('If Wildcard').item.json.plateNormalized }}",
+              "type": "string"
+            },
+            {
+              "id": "722a9813-178b-418f-a56e-bc3c119691a2",
+              "name": "eventCount",
+              "value": "={{ $json.eventCount }}",
+              "type": "number"
+            },
+            {
+              "id": "9c56752d-0886-4cd0-8df7-e9f1e780cf47",
+              "name": "",
+              "value": "",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1888,
+        1600
+      ],
+      "id": "0d45c23c-0f30-4278-9b3a-93d279b2a34a",
+      "name": "Plate & Count"
+    },
+    {
+      "parameters": {
+        "jsCode": "const candidate = $('Loop Over Items1').item.json;\n// or $('Normalize').item.json if that is the correct candidate source\n\nif (candidate.isLowConfidence) {\n  return [{\n    json: {\n      ...candidate,\n      dbExactExists: false,\n      dbCount: 0,\n      dbMatchedPlate: null,\n      bestDbPlate: null,\n      bestDbPlateCount: 0,\n      dbMatchedPlatesCount: 0,\n      wildcardMatches: [],\n      dbLookupSkipped: true,\n      dbSkipReason: 'overallConf_below_0_5'\n    }\n  }];\n}\n\nconst dbRow = $json;\n\nconst rawCount =\n  dbRow.eventCount ??\n  dbRow.count ??\n  0;\n\nconst dbCount = Number(rawCount || 0);\n\nreturn [{\n  json: {\n    ...candidate,\n    dbExactExists: dbCount > 0,\n    dbCount,\n    dbMatchedPlate: dbCount > 0 ? candidate.plateNormalized : null,\n    bestDbPlate: null,\n    bestDbPlateCount: 0,\n    dbMatchedPlatesCount: dbCount > 0 ? 1 : 0,\n    wildcardMatches: [],\n    dbLookupSkipped: false,\n    dbSkipReason: null\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2096,
+        1600
+      ],
+      "id": "0dc19bd8-8b74-4295-85cd-9cff21096066",
+      "name": "Exists in DB?"
+    },
+    {
+      "parameters": {
+        "jsCode": "function wildcardToRegex(pattern) {\n  const escaped = pattern.replace(/[.*+?^${}()|[\\]\\\\]/g, '\\\\$&');\n  return new RegExp('^' + escaped.replace(/%/g, '.*') + '$');\n}\n\n// take the CURRENT candidate item that entered this wildcard branch\nconst candidate = $('Loop Over Items1').item.json;\n// if your linked node should be Normalize instead, use:\n// const candidate = $('Normalize').item.json;\n\nif (candidate.isLowConfidence) {\n  return [{\n    json: {\n      ...candidate,\n      dbExactExists: false,\n      dbCount: 0,\n      dbMatchedPlate: null,\n      bestDbPlate: null,\n      bestDbPlateCount: 0,\n      dbMatchedPlatesCount: 0,\n      wildcardMatches: [],\n      dbLookupSkipped: true,\n      dbSkipReason: 'overallConf_below_0_5'\n    }\n  }];\n}\n\nconst candidatePlate = String(candidate.plateNormalized || '').toUpperCase();\n\nif (!candidate.hasWildcard || !candidatePlate.includes('%')) {\n  throw new Error(`Wildcard path received non-wildcard candidate: ${candidatePlate}`);\n}\n\nconst regex = wildcardToRegex(candidatePlate);\n\n// items here = all DB rows from \"get all\"\nconst matches = items\n  .map(i => i.json)\n  .filter(row => regex.test(String(row.plate || '').toUpperCase()));\n\nconst normalizedMatches = matches.map(row => ({\n  plate: String(row.plate || '').toUpperCase(),\n  count: Number(row.eventCount || row.count || 0)\n}));\n\nconst dbCount = normalizedMatches.reduce((sum, row) => sum + row.count, 0);\n\nnormalizedMatches.sort((a, b) => b.count - a.count);\nconst best = normalizedMatches[0] || null;\n\nreturn [{\n  json: {\n    ...candidate,\n    dbExactExists: false,\n    dbCount,\n    dbMatchedPlate: best ? best.plate : null,\n    bestDbPlate: best ? best.plate : null,\n    bestDbPlateCount: best ? best.count : 0,\n    dbMatchedPlatesCount: normalizedMatches.length,\n    wildcardMatches: normalizedMatches,\n    dbLookupSkipped: false,\n    dbSkipReason: null\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2048,
+        1776
+      ],
+      "id": "5b7d587d-1a47-45cf-b13e-5ac1d8c79130",
+      "name": "Find wildcard matches"
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "dataTableId": {
+          "__rl": true,
+          "value": "p5Imd0Fndup1bhLE",
+          "mode": "list",
+          "cachedResultName": "events",
+          "cachedResultUrl": "/projects/RMVda2C0F3gwCTVn/datatables/p5Imd0Fndup1bhLE"
+        }
+      },
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        1712,
+        1776
+      ],
+      "id": "1e5a131a-381b-4934-b57f-b93ce2513569",
+      "name": "Get all rows"
+    },
+    {
+      "parameters": {
+        "jsCode": "const groups = new Map();\n\nfor (const item of $input.all()) {\n  const j = item.json;\n  const eventId = j.eventId ?? 'unknown_event';\n\n  const candidate = {\n    rank: j.rank ?? null,\n    plateRaw: j.plateRaw ?? null,\n    plateNormalized: j.plateNormalized ?? null,\n    overallConf: j.overallConf ?? null,\n    charConf: Array.isArray(j.charConf) ? j.charConf : [],\n    notes: j.notes ?? '',\n    hasWildcard: !!j.hasWildcard,\n\n    dbExactExists: !!j.dbExactExists,\n    dbCount: Number(j.dbCount || 0),\n    dbMatchedPlate: j.dbMatchedPlate ?? null,\n\n    bestDbPlate: j.bestDbPlate ?? null,\n    bestDbPlateCount: Number(j.bestDbPlateCount || 0),\n    dbMatchedPlatesCount: Number(j.dbMatchedPlatesCount || 0),\n    wildcardMatches: Array.isArray(j.wildcardMatches) ? j.wildcardMatches : []\n  };\n\n  if (!groups.has(eventId)) {\n    groups.set(eventId, []);\n  }\n\n  groups.get(eventId).push(candidate);\n}\n\nconst output = [];\n\nfor (const [eventId, candidates] of groups.entries()) {\n  candidates.sort((a, b) => Number(a.rank || 999) - Number(b.rank || 999));\n\n  output.push({\n    json: {\n      eventId,\n      candidates\n    }\n  });\n}\n\nreturn output;\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1600,
+        1296
+      ],
+      "id": "fa78a8a5-dad2-443a-9680-ed2b2a1b2560",
+      "name": "Aggregate"
+    },
+    {
+      "parameters": {
+        "jsCode": "return items.map(item => {\n  const candidates = (item.json.candidates || []).map(c => {\n    const resolvedPlate = c.hasWildcard\n      ? (c.bestDbPlate || null)\n      : (c.plateNormalized || null);\n\n    return {\n      rank: c.rank ?? null,\n      plateRaw: c.plateRaw ?? null,\n      plateNormalized: c.plateNormalized ?? null,\n      resolvedPlate,\n      overallConf: c.overallConf ?? null,\n      dbCount: Number(c.dbCount || 0),\n      bestDbPlate: c.bestDbPlate ?? null,\n      bestDbPlateCount: Number(c.bestDbPlateCount || 0),\n      hasWildcard: !!c.hasWildcard,\n      notes: c.notes ?? ''\n    };\n  });\n\n  return {\n    json: {\n      eventId: item.json.eventId ?? null,\n      candidates,\n      openaiBody: {\n        model: \"gpt-5-mini-2025-08-07\",\n        input: [\n          {\n            role: \"system\",\n            content:\n              \"You are the final parking LPN decision agent.\\n\" +\n              \"You must choose the best final licence plate from the provided candidate list, or return N.A.\\n\\n\" +\n              \"Rules:\\n\" +\n              \"- You may ONLY choose finalPlate from the provided resolvedPlate values, or return null when decision='N.A.'.\\n\" +\n              \"- Never invent, rewrite, or compose a new plate.\\n\" +\n              \"- Prefer candidates with stronger image confidence and stronger DB evidence.\\n\" +\n              \"- If multiple candidates resolve to the same resolvedPlate, treat that as supporting evidence for that resolvedPlate.\\n\" +\n              \"- Wildcard candidates are only valid through their resolvedPlate.\\n\" +\n              \"- If evidence is conflicting or insufficient, return decision='N.A.'.\\n\" +\n              \"- Return JSON only.\"\n          },\n          {\n            role: \"user\",\n            content: [\n              {\n                type: \"input_text\",\n                text:\n                  \"Choose the best final licence plate from the following enriched candidates, or return N.A.:\\n\\n\" +\n                  JSON.stringify({ candidates }, null, 2)\n              }\n            ]\n          }\n        ],\n        text: {\n          format: {\n            type: \"json_schema\",\n            name: \"final_lpn_decision\",\n            strict: true,\n            schema: {\n              type: \"object\",\n              additionalProperties: false,\n              properties: {\n                decision: {\n                  type: \"string\",\n                  enum: [\"POST\", \"N.A.\"]\n                },\n                finalPlate: {\n                  type: [\"string\", \"null\"]\n                },\n                chosenRank: {\n                  type: [\"integer\", \"null\"]\n                },\n                selectedFromProvided: {\n                  type: \"boolean\"\n                },\n                confidence: {\n                  type: \"number\",\n                  minimum: 0,\n                  maximum: 1\n                },\n                reason: {\n                  type: \"string\"\n                }\n              },\n              required: [\n                \"decision\",\n                \"finalPlate\",\n                \"chosenRank\",\n                \"selectedFromProvided\",\n                \"confidence\",\n                \"reason\"\n              ]\n            }\n          }\n        }\n      }\n    }\n  };\n});"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1824,
+        1296
+      ],
+      "id": "ae039de8-d6a6-4e3b-bb97-cab28cbc82ed",
+      "name": "Build OpenAI Body"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.openai.com/v1/responses",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "openAiApi",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $json.openaiBody }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        2032,
+        1296
+      ],
+      "id": "e3a2fb1c-e63d-4950-9491-5f063895f0ce",
+      "name": "Final LPN",
+      "credentials": {
+        "openAiApi": {
+          "id": "DGMKhtjWiud3t6nI",
+          "name": "GPT_Credentials"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "return items.map(item => ({\n  json: {\n    ...item.json,\n    startedAtIso: new Date().toISOString(),\n    startedAtMs: Date.now()\n  },\n  binary: item.binary\n}));"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -16,
+        1440
+      ],
+      "id": "d19f0c27-1c88-4dcf-a564-557ebcdc594c",
+      "name": "Init Test Metrics"
+    },
+    {
+      "parameters": {
+        "jsCode": "function safeUsageAt(nodeName, idx) {\n  try {\n    const all = $(nodeName).all();\n    const r = all[idx]?.json?.body ?? all[idx]?.json;\n\n    return {\n      model: r?.model ?? null,\n      inputTokens: Number(r?.usage?.input_tokens || 0),\n      cachedInputTokens: Number(r?.usage?.input_tokens_details?.cached_tokens || 0),\n      outputTokens: Number(r?.usage?.output_tokens || 0),\n      totalTokens: Number(r?.usage?.total_tokens || 0),\n      used: !!r\n    };\n  } catch {\n    return {\n      model: null,\n      inputTokens: 0,\n      cachedInputTokens: 0,\n      outputTokens: 0,\n      totalTokens: 0,\n      used: false\n    };\n  }\n}\n\nfunction getPricingEur(model) {\n  const m = String(model || '').toLowerCase();\n\n  if (m.includes('gpt-5-mini')) {\n    return {\n      inputPer1M: 0.216807,\n      cachedInputPer1M: 0.021681,\n      outputPer1M: 1.734455\n    };\n  }\n\n  if (m.includes('gpt-5-nano')) {\n    return {\n      inputPer1M: 0.043361,\n      cachedInputPer1M: 0.004336,\n      outputPer1M: 0.346891\n    };\n  }\n\n  return {\n    inputPer1M: 0,\n    cachedInputPer1M: 0,\n    outputPer1M: 0\n  };\n}\n\nfunction calcCostEur(u) {\n  const p = getPricingEur(u.model);\n\n  const cachedInput = Math.min(u.cachedInputTokens || 0, u.inputTokens || 0);\n  const uncachedInput = Math.max(0, (u.inputTokens || 0) - cachedInput);\n\n  const inputCostEur =\n    (uncachedInput / 1_000_000) * p.inputPer1M +\n    (cachedInput / 1_000_000) * p.cachedInputPer1M;\n\n  const outputCostEur =\n    ((u.outputTokens || 0) / 1_000_000) * p.outputPer1M;\n\n  return {\n    inputCostEur,\n    outputCostEur,\n    totalCostEur: inputCostEur + outputCostEur\n  };\n}\n\nconst currentItems = $input.all();\nconst startItems = $('Init Test Metrics').all();\n\nreturn currentItems.map((item, idx) => {\n  const startNode = startItems[idx]?.json ?? {};\n\n  const startedAtIso = startNode.startedAtIso ?? null;\n  const startedAtMs = Number(startNode.startedAtMs || 0);\n\n  const finishedAtIso = new Date().toISOString();\n  const finishedAtMs = Date.now();\n  const latencyMs = startedAtMs ? (finishedAtMs - startedAtMs) : null;\n  const latencySec = latencyMs ? Number((latencyMs / 1000).toFixed(2)) : null;\n\n  const u1 = safeUsageAt('Find Vehicle', idx);\n  const u2 = safeUsageAt('LPN Review', idx);\n  const u3 = safeUsageAt('Final LPN', idx);\n\n  const usages = [u1, u2, u3].filter(u => u.used);\n\n  const openAiCallCount = usages.length;\n  const inputTokens = usages.reduce((s, u) => s + u.inputTokens, 0);\n  const cachedInputTokens = usages.reduce((s, u) => s + u.cachedInputTokens, 0);\n  const outputTokens = usages.reduce((s, u) => s + u.outputTokens, 0);\n  const totalTokens = usages.reduce((s, u) => s + u.totalTokens, 0);\n\n  const modelCounts = {};\n  const costByModel = {};\n\n  let inputCostEur = 0;\n  let outputCostEur = 0;\n  let totalCostEur = 0;\n\n  for (const u of usages) {\n    if (u.model) {\n      modelCounts[u.model] = (modelCounts[u.model] || 0) + 1;\n    }\n\n    const c = calcCostEur(u);\n\n    inputCostEur += c.inputCostEur;\n    outputCostEur += c.outputCostEur;\n    totalCostEur += c.totalCostEur;\n\n    if (u.model) {\n      costByModel[u.model] ??= {\n        calls: 0,\n        inputTokens: 0,\n        cachedInputTokens: 0,\n        outputTokens: 0,\n        totalTokens: 0,\n        inputCostEur: 0,\n        outputCostEur: 0,\n        totalCostEur: 0\n      };\n\n      costByModel[u.model].calls += 1;\n      costByModel[u.model].inputTokens += u.inputTokens;\n      costByModel[u.model].cachedInputTokens += u.cachedInputTokens;\n      costByModel[u.model].outputTokens += u.outputTokens;\n      costByModel[u.model].totalTokens += u.totalTokens;\n      costByModel[u.model].inputCostEur += c.inputCostEur;\n      costByModel[u.model].outputCostEur += c.outputCostEur;\n      costByModel[u.model].totalCostEur += c.totalCostEur;\n    }\n  }\n\n  const modelsUsed = Object.keys(modelCounts).join(' | ');\n\n  return {\n    json: {\n      eventId: item.json.eventId ?? null,\n      startedAt: startedAtIso,\n      finishedAt: finishedAtIso,\n      latencyMs,\n      latencySec,\n\n      openAiCallCount,\n      modelsUsed,\n      modelCounts: JSON.stringify(modelCounts),\n\n      inputTokens,\n      cachedInputTokens,\n      outputTokens,\n      totalTokens,\n      candidateCount: item.json.candidateCount ?? null,\n\n      inputCostEur: Number(inputCostEur.toFixed(6)),\n      outputCostEur: Number(outputCostEur.toFixed(6)),\n      totalCostEur: Number(totalCostEur.toFixed(6)),\n      costByModel: JSON.stringify(\n        Object.fromEntries(\n          Object.entries(costByModel).map(([model, v]) => [\n            model,\n            {\n              ...v,\n              inputCostEur: Number(v.inputCostEur.toFixed(6)),\n              outputCostEur: Number(v.outputCostEur.toFixed(6)),\n              totalCostEur: Number(v.totalCostEur.toFixed(6))\n            }\n          ])\n        )\n      ),\n\n      decision: item.json.decision ?? 'N.A.',\n      finalPlate: String(item.json.finalPlate || 'n.a.'),\n      chosenRank: item.json.chosenRank ?? null,\n      selectedFromProvided: item.json.selectedFromProvided ?? null,\n      confidence: item.json.confidence ?? null,\n      reason: item.json.reason ?? null\n    }\n  };\n});"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2624,
+        1296
+      ],
+      "id": "b6e71059-9942-42ee-a33d-1f816954c844",
+      "name": "Build Log Row"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.openai.com/v1/responses",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "openAiApi",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"model\": \"gpt-5-nano-2025-08-07\",\n  \"input\": [\n    {\n      \"role\": \"system\",\n      \"content\": \"You locate the largest/closest vehicle in the image. Return JSON only.\"\n    },\n    {\n      \"role\": \"user\",\n      \"content\": [\n        { \"type\": \"input_text\", \"text\": \"Return vehicleVisible, bboxConfidence, bbox (x,y,w,h) normalized 0..1. Do not pick road/markings.\" },\n        {\n          \"type\": \"input_image\",\n          \"image_url\": \"{{$json.pictureUrl}}\",\n          \"detail\": \"low\"\n        }\n      ]\n    }\n  ],\n  \"text\": {\n    \"format\": {\n      \"type\": \"json_schema\",\n      \"name\": \"vehicle_bbox\",\n      \"strict\": true,\n      \"schema\": {\n        \"type\": \"object\",\n        \"additionalProperties\": false,\n        \"properties\": {\n          \"vehicleVisible\": { \"type\": \"boolean\" },\n          \"bboxConfidence\": { \"type\": \"number\", \"minimum\": 0, \"maximum\": 1 },\n          \"bbox\": {\n            \"type\": \"object\",\n            \"additionalProperties\": false,\n            \"properties\": {\n              \"x\": { \"type\": \"number\", \"minimum\": 0, \"maximum\": 1 },\n              \"y\": { \"type\": \"number\", \"minimum\": 0, \"maximum\": 1 },\n              \"w\": { \"type\": \"number\", \"minimum\": 0, \"maximum\": 1 },\n              \"h\": { \"type\": \"number\", \"minimum\": 0, \"maximum\": 1 }\n            },\n            \"required\": [\"x\",\"y\",\"w\",\"h\"]\n          }\n        },\n        \"required\": [\"vehicleVisible\",\"bboxConfidence\",\"bbox\"]\n      }\n    }\n  }\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        -224,
+        1088
+      ],
+      "id": "8d9995e2-3fc9-4601-ba4b-bcb0a77e3605",
+      "name": "Find Vehicle",
+      "credentials": {
+        "openAiApi": {
+          "id": "DGMKhtjWiud3t6nI",
+          "name": "GPT_Credentials"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "function extractOutputText(resp) {\n  for (const entry of (resp.output || [])) {\n    if (entry.type === \"message\") {\n      for (const part of (entry.content || [])) {\n        if (part.type === \"output_text\" && typeof part.text === \"string\") {\n          return part.text;\n        }\n      }\n    }\n  }\n  return null;\n}\n\nfunction cleanPlate(value) {\n  const raw = String(value || '').trim().toUpperCase();\n\n  if (!raw) return null;\n  if (['NA', 'N/A', 'N.A', 'N.A.'].includes(raw)) return 'n.a.';\n\n  const compact = raw\n    .replace(/[.\\s\\-_\\/\\\\|]/g, '')\n    .replace(/[^A-Z0-9]/g, '');\n\n  if (!compact || compact === 'NA') return 'n.a.';\n\n  return compact;\n}\n\nconst sourceItems = $('Prepare Final Decision HTTP Body').all();\nconst responseItems = $input.all();\n\nreturn responseItems.map((item, idx) => {\n  const text = extractOutputText(item.json);\n  if (!text) throw new Error(`No output_text found in Final LPN response at index ${idx}`);\n\n  const parsed = JSON.parse(text);\n  const confidence = Number(parsed.confidence || 0);\n  const cleanedFinalPlate = cleanPlate(parsed.finalPlate);\n  const forcedNA =\n    parsed.decision !== 'POST' ||\n    confidence < 0.5 ||\n    !cleanedFinalPlate ||\n    cleanedFinalPlate === 'n.a.';\n\n  return {\n    json: {\n      eventId: sourceItems[idx]?.json.eventId ?? null,\n      candidateCount: sourceItems[idx]?.json.candidateCount ?? null,\n      decision: forcedNA ? 'N.A.' : 'POST',\n      finalPlate: forcedNA ? 'n.a.' : cleanedFinalPlate,\n      chosenRank: forcedNA ? null : (parsed.chosenRank ?? null),\n      selectedFromProvided: forcedNA ? false : Boolean(parsed.selectedFromProvided),\n      confidence,\n      reason: forcedNA\n        ? `forced_n.a.: ${parsed.reason || 'below threshold or invalid plate'}`\n        : (parsed.reason || '')\n    }\n  };\n});"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2240,
+        1296
+      ],
+      "id": "93ceb33b-bdec-4b84-969e-390e13a6d702",
+      "name": "Final Result"
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "1j4NAuIG22z2mOl2rslKn96I5_MlJii_O-nGDjDhG7k8",
+          "mode": "list",
+          "cachedResultName": "AI REVIEW RESULTS",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1j4NAuIG22z2mOl2rslKn96I5_MlJii_O-nGDjDhG7k8/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "Sheet1",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1j4NAuIG22z2mOl2rslKn96I5_MlJii_O-nGDjDhG7k8/edit#gid=0"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "DECISION": "={{ $json.decision }}",
+            "REASON": "={{ $json.reason }}",
+            "CONFIDENCE": "={{ $json.confidence }}",
+            "ACTUAL RESULT": "={{ \"'\" + String($json.finalPlate || 'n.a.') }}",
+            "SELECTED FROM PROVIDED": "={{ $json.selectedFromProvided }}",
+            "LATENCY": "={{ $json.latencySec }}",
+            "MODELS": "={{ $json.modelsUsed }}",
+            "COST BY MODEL": "={{ $json.costByModel }}",
+            "TOTAL COST": "={{ $json.totalCostEur }}",
+            "OUTPUT COST": "={{ $json.outputCostEur }}",
+            "INPUT COST": "={{ $json.inputCostEur }}",
+            "CANDIDATES": "={{ $json.candidateCount }}",
+            "EVENT ID": "=https://flomo-test.s3.eu-north-1.amazonaws.com/{{ $json.eventId }}.jpg",
+            "EXPECTED RESULT": "={{ $json.expectedLpn }}",
+            "IS MATCH": "={{ $json.isMatch }}"
+          },
+          "matchingColumns": [
+            "EXPECTED RESULT"
+          ],
+          "schema": [
+            {
+              "id": "IS MATCH",
+              "displayName": "IS MATCH",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "EXPECTED RESULT",
+              "displayName": "EXPECTED RESULT",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "ACTUAL RESULT",
+              "displayName": "ACTUAL RESULT",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "CONFIDENCE",
+              "displayName": "CONFIDENCE",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "CANDIDATES",
+              "displayName": "CANDIDATES",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "DECISION",
+              "displayName": "DECISION",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "SELECTED FROM PROVIDED",
+              "displayName": "SELECTED FROM PROVIDED",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "REASON",
+              "displayName": "REASON",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "LATENCY",
+              "displayName": "LATENCY",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "MODELS",
+              "displayName": "MODELS",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "INPUT COST",
+              "displayName": "INPUT COST",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "OUTPUT COST",
+              "displayName": "OUTPUT COST",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "TOTAL COST",
+              "displayName": "TOTAL COST",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "COST BY MODEL",
+              "displayName": "COST BY MODEL",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "EVENT ID",
+              "displayName": "EVENT ID",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        2496,
+        1408
+      ],
+      "id": "8930e7ed-1c60-4ae7-9a38-005adcb99ea7",
+      "name": "Append row in sheet",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "0JFjiBxFpHfuTTNE",
+          "name": "Maksims Locs"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const expectedByEventId = {\n  \"CASE_001\": \"EXPECTED_001\",\n  \"CASE_002\": \"EXPECTED_002\",\n  \"CASE_003\": \"EXPECTED_003\"\n};\n\nfunction normalizeForCompare(value) {\n  return String(value || '')\n    .toUpperCase()\n    .replace(/[^A-Z0-9]/g, '');\n}\n\nreturn items.map(item => {\n  const eventId = item.json.eventId ?? $('Loop Over Items').first().json.id;\n  const expectedLpn = expectedByEventId[eventId] ?? null;\n  const actualNormalized = normalizeForCompare(item.json.finalPlate);\n  const expectedNormalized = normalizeForCompare(expectedLpn);\n\n  return {\n    json: {\n      ...item.json,\n      eventId,\n      expectedLpn,\n      isMatch:\n        expectedLpn === null || !actualNormalized\n          ? null\n          : actualNormalized === expectedNormalized\n    }\n  };\n});"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2816,
+        1376
+      ],
+      "id": "e8af18d7-30ba-4c2a-8c2c-05da5f3c5f55",
+      "name": "Expected Result mapping"
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        2240,
+        1728
+      ],
+      "id": "29d121fa-9e7b-4507-8d84-5f1e5731de86",
+      "name": "Merge2"
+    },
+    {
+      "parameters": {
+        "jsCode": "const out = [];\n\nfunction detectMimeFromBuffer(buf) {\n  if (\n    buf.length >= 3 &&\n    buf[0] === 0xff &&\n    buf[1] === 0xd8 &&\n    buf[2] === 0xff\n  ) return 'image/jpeg';\n\n  if (\n    buf.length >= 8 &&\n    buf[0] === 0x89 &&\n    buf[1] === 0x50 &&\n    buf[2] === 0x4e &&\n    buf[3] === 0x47 &&\n    buf[4] === 0x0d &&\n    buf[5] === 0x0a &&\n    buf[6] === 0x1a &&\n    buf[7] === 0x0a\n  ) return 'image/png';\n\n  if (\n    buf.length >= 6 &&\n    buf.toString('ascii', 0, 6) === 'GIF87a'\n  ) return 'image/gif';\n\n  if (\n    buf.length >= 6 &&\n    buf.toString('ascii', 0, 6) === 'GIF89a'\n  ) return 'image/gif';\n\n  if (\n    buf.length >= 12 &&\n    buf.toString('ascii', 0, 4) === 'RIFF' &&\n    buf.toString('ascii', 8, 12) === 'WEBP'\n  ) return 'image/webp';\n\n  return null;\n}\n\nfor (let i = 0; i < items.length; i++) {\n  const item = items[i];\n\n  const buf = await this.helpers.getBinaryDataBuffer(i, 'image');\n  if (!buf || !buf.length) {\n    throw new Error(`No binary buffer found for item ${i}`);\n  }\n\n  const mimeType = detectMimeFromBuffer(buf);\n  if (!mimeType) {\n    throw new Error(`Unsupported or invalid cropped image bytes for item ${i}`);\n  }\n\n  const base64 = buf.toString('base64');\n  const dataUrl = `data:${mimeType};base64,${base64}`;\n\n  out.push({\n    json: {\n      eventId: item.json.eventId ?? item.json.id ?? null,\n      openaiBody: {\n        model: \"gpt-5-mini-2025-08-07\",\n        input: [\n          {\n            role: \"system\",\n            content:\n  \"You are an OCR candidate extraction agent for parking licence plates.\\n\" +\n  \"Your task is ONLY to read the plate from the provided cropped image and return Top-K OCR candidates.\\n\" +\n  \"Do NOT make a final POST / N.A. decision.\\n\" +\n  \"Do NOT use database knowledge, plate frequency, country assumptions, or pattern familiarity to guess missing characters.\\n\\n\" +\n\n  \"Core principle:\\n\" +\n  \"A wrong resolved character is worse than a wildcard (%).\\n\" +\n  \"If a character is not visually dominant, use % instead of guessing.\\n\\n\" +\n\n  \"Output rules:\\n\" +\n  \"- Return up to 5 distinct candidate strings, ordered strongest to weakest.\\n\" +\n  \"- Use ONLY uppercase A-Z, digits 0-9, and % for unknown characters.\\n\" +\n  \"- Remove spaces, dashes, separators, and decorative symbols.\\n\" +\n  \"- Do not force a complete plate.\\n\" +\n  \"- Do not insert extra characters to complete a plate.\\n\" +\n  \"- Do not drop uncertain edge characters; use % instead.\\n\" +\n  \"- If 2 or more characters are uncertain, prefer a partially wildcarded candidate over a fully guessed one.\\n\" +\n  \"- If the plate is poorly visible, set plateVisible=false and return conservative wildcard candidates.\\n\\n\" +\n\n  \"Character confidence rules:\\n\" +\n  \"- charConf is per-character visual certainty, not sequence confidence.\\n\" +\n  \"- charConf must reflect how clearly that exact character is visible in the image.\\n\" +\n  \"- Use high values only for visually dominant characters.\\n\" +\n  \"- If a character could plausibly be another similar glyph, reduce charConf substantially.\\n\" +\n  \"- If uncertainty is high enough that you hesitate between multiple glyphs, output % instead of a resolved character.\\n\\n\" +\n\n  \"Confidence guidance:\\n\" +\n  \"- 0.95-1.00 = character is very clear, alternatives unlikely\\n\" +\n  \"- 0.85-0.94 = readable, minor ambiguity only\\n\" +\n  \"- 0.70-0.84 = noticeable ambiguity; use resolved character only if still visually strongest\\n\" +\n  \"- 0.50-0.69 = weak / doubtful; usually prefer %\\n\" +\n  \"- below 0.50 = should almost never be a resolved character\\n\\n\" +\n\n  \"Wildcard rules:\\n\" +\n  \"- If a character is below 0.70, strongly prefer %.\\n\" +\n  \"- If multiple adjacent characters are uncertain, wildcard them instead of inventing a clean-looking sequence.\\n\" +\n  \"- If the first or last character is affected by crop, blur, glare, dirt, or shadow, use % instead of inserting or deleting characters.\\n\" +\n  \"- A conservative partial reading is better than a wrong complete reading.\\n\\n\" +\n\n  \"Sequence rules:\\n\" +\n  \"- Do not reconstruct a clean plate from weak evidence.\\n\" +\n  \"- Do not infer a standard plate format from habit.\\n\" +\n  \"- Prefer conservative partial truth over confident hallucination.\\n\" +\n  \"- Candidate length should reflect visible evidence, not guessed structure.\\n\\n\" +\n\n  \"Notes:\\n\" +\n  \"- notes should briefly describe the main ambiguity such as O/0, B/8, 5/S, Z/2, V/W, crop edge loss, glare, dirt, blur, or shadow.\\n\" +\n  \"- Keep notes short and factual.\\n\\n\" +\n\n  \"Return JSON only.\"\n          },\n          {\n            role: \"user\",\n            content: [\n              {\n                type: \"input_text\",\n                text:\n                    \"Read the licence plate from this cropped image and return only OCR candidates. \" +\n  \"Be conservative. If a character is not clearly visible, use % instead of guessing. \" +\n  \"Do not force a complete plate. Do not insert extra characters or invent missing ones. \" +\n  \"Return Top-K candidates with honest per-character confidence.\"\n              },\n              {\n                type: \"input_image\",\n                image_url: dataUrl,\n                detail: \"high\"\n              }\n            ]\n          }\n        ],\n        text: {\n          format: {\n            type: \"json_schema\",\n            name: \"lpn_candidates\",\n            strict: true,\n            schema: {\n              type: \"object\",\n              additionalProperties: false,\n              properties: {\n                plateVisible: { type: \"boolean\" },\n                candidates: {\n                  type: \"array\",\n                  minItems: 0,\n                  maxItems: 5,\n                  items: {\n                    type: \"object\",\n                    additionalProperties: false,\n                    properties: {\n                      plate: { type: \"string\", pattern: \"^[A-Z0-9%]+$\" },\n                      overallConf: { type: \"number\", minimum: 0, maximum: 1 },\n                      charConf: {\n                        type: \"array\",\n                        items: { type: \"number\", minimum: 0, maximum: 1 }\n                      },\n                      notes: { type: \"string\" }\n                    },\n                    required: [\"plate\", \"overallConf\", \"charConf\", \"notes\"]\n                  }\n                }\n              },\n              required: [\"plateVisible\", \"candidates\"]\n            }\n          }\n        }\n      }\n    },\n    binary: item.binary\n  });\n}\n\nreturn out;"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1536,
+        1056
+      ],
+      "id": "78061992-3ab3-410c-b83c-5f9243d2971b",
+      "name": "Prepare Final Decision HTTP Body"
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "combineBy": "combineByPosition",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        1312,
+        1056
+      ],
+      "id": "8531bfb4-a0f4-4a83-b130-6cdb112d1639",
+      "name": "Merge3"
+    },
+    {
+      "parameters": {
+        "jsCode": "return items.map(item => ({\n  json: {\n    eventId: item.json.id ?? item.json.eventId ?? null,\n    startedAtIso: item.json.startedAtIso ?? null,\n    startedAtMs: item.json.startedAtMs ?? null\n  }\n}));"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1056,
+        1440
+      ],
+      "id": "c9aa0d45-693f-4cfc-862f-fdbada49977e",
+      "name": "Carry Event Meta"
+    },
+    {
+      "parameters": {
+        "jsCode": "function cleanPlate(p) {\n  return String(p || '')\n    .toUpperCase()\n    .replace(/[\\s\\-\\/\\\\]/g, '')\n    .replace(/[^A-Z0-9%]/g, '');\n}\n\nfunction clamp01(v) {\n  const n = Number(v);\n  if (!Number.isFinite(n)) return 0;\n  return Math.max(0, Math.min(1, n));\n}\n\nfunction geometricMean(values) {\n  if (!values.length) return 0;\n  const safe = values.map(v => Math.max(0.001, clamp01(v)));\n  const sumLogs = safe.reduce((a, v) => a + Math.log(v), 0);\n  return Math.exp(sumLogs / safe.length);\n}\n\nreturn items.map(item => {\n  const plateVisible = Boolean(item.json.plateVisible);\n  const inputCandidates = Array.isArray(item.json.candidates) ? item.json.candidates : [];\n\n  const processed = [];\n  const seen = new Set();\n\n  for (const c of inputCandidates) {\n    const rawPlate = cleanPlate(c.plate || '');\n    if (!rawPlate) continue;\n\n    const rawCharConf = Array.isArray(c.charConf) ? c.charConf : [];\n\n    // Align charConf length to plate length\n    const charConf = rawPlate.split('').map((_, i) => {\n      if (i >= rawCharConf.length) return 0.5;\n      return clamp01(rawCharConf[i]);\n    });\n\n    const chars = rawPlate.split('');\n    let wildcardCount = 0;\n    let weakCount = 0;\n    let veryWeakCount = 0;\n\n    for (let i = 0; i < chars.length; i++) {\n      const conf = charConf[i];\n\n      if (conf < 0.75) {\n        chars[i] = '%';\n        wildcardCount++;\n      }\n\n      if (conf < 0.80) weakCount++;\n      if (conf < 0.65) veryWeakCount++;\n    }\n\n    const wildcardedPlate = chars.join('');\n\n    // Adjust overall confidence more conservatively\n    let adjusted = geometricMean(charConf);\n    adjusted -= weakCount * 0.04;\n    adjusted -= veryWeakCount * 0.07;\n    adjusted -= wildcardCount * 0.03;\n\n    // Cap confidence when too much uncertainty exists\n    if (wildcardCount >= 2) adjusted = Math.min(adjusted, 0.62);\n    if (wildcardCount >= 3) adjusted = Math.min(adjusted, 0.50);\n\n    adjusted = Math.max(0, Math.min(1, adjusted));\n\n    const notes = [\n      c.notes || '',\n      wildcardCount > 0 ? `postprocess wildcarded=${wildcardCount}` : ''\n    ].filter(Boolean).join(' | ');\n\n    if (seen.has(wildcardedPlate)) continue;\n    seen.add(wildcardedPlate);\n\n    processed.push({\n      plate: wildcardedPlate,\n      overallConf: Number(adjusted.toFixed(2)),\n      charConf: charConf.map(v => Number(v.toFixed(2))),\n      notes\n    });\n  }\n\n  processed.sort((a, b) => b.overallConf - a.overallConf);\n\n  return {\n    json: {\n      ...item.json,\n      plateVisible,\n      candidates: processed.slice(0, 5)\n    }\n  };\n});"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2272,
+        1056
+      ],
+      "id": "4afb9ce3-de67-4fcb-bc8c-441ee97852b8",
+      "name": "Wildcard post-processing"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "When clicking ‘Execute workflow’": {
+      "main": [
+        [
+          {
+            "node": "Set Config",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set Config": {
+      "main": [
+        [
+          {
+            "node": "Login",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Login": {
+      "main": [
+        [
+          {
+            "node": "Refresh Token",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Refresh Token": {
+      "main": [
+        [
+          {
+            "node": "Get all n.a.'s",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get all n.a.'s": {
+      "main": [
+        [
+          {
+            "node": "Split",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split": {
+      "main": [
+        [
+          {
+            "node": "Init Test Metrics",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP Request": {
+      "main": [
+        [
+          {
+            "node": "Read Image",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge": {
+      "main": [
+        [
+          {
+            "node": "Remove Unnecessary Fields",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Compute Cropped Image": {
+      "main": [
+        [
+          {
+            "node": "Merge1",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Crop Image": {
+      "main": [
+        [
+          {
+            "node": "Merge3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read Image": {
+      "main": [
+        [
+          {
+            "node": "Get Image1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Picture URL": {
+      "main": [
+        [
+          {
+            "node": "Find Vehicle",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Remove Unnecessary Fields": {
+      "main": [
+        [
+          {
+            "node": "Compute Cropped Image",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Image1": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Merge1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge1": {
+      "main": [
+        [
+          {
+            "node": "Crop Image",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "LPN Review": {
+      "main": [
+        [
+          {
+            "node": "LPN Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "LPN Result": {
+      "main": [
+        [
+          {
+            "node": "Wildcard post-processing",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalize": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Items1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Loop Over Items1": {
+      "main": [
+        [
+          {
+            "node": "Aggregate",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "If Wildcard",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If Wildcard": {
+      "main": [
+        [
+          {
+            "node": "Cross-reference DB",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Get all rows",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Cross-reference DB": {
+      "main": [
+        [
+          {
+            "node": "Plate & Count",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Plate & Count": {
+      "main": [
+        [
+          {
+            "node": "Exists in DB?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Exists in DB?": {
+      "main": [
+        [
+          {
+            "node": "Merge2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Find wildcard matches": {
+      "main": [
+        [
+          {
+            "node": "Merge2",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Get all rows": {
+      "main": [
+        [
+          {
+            "node": "Find wildcard matches",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Aggregate": {
+      "main": [
+        [
+          {
+            "node": "Build OpenAI Body",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build OpenAI Body": {
+      "main": [
+        [
+          {
+            "node": "Final LPN",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Final LPN": {
+      "main": [
+        [
+          {
+            "node": "Final Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Init Test Metrics": {
+      "main": [
+        [
+          {
+            "node": "Picture URL",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Carry Event Meta",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Log Row": {
+      "main": [
+        [
+          {
+            "node": "Expected Result mapping",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Find Vehicle": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Final Result": {
+      "main": [
+        [
+          {
+            "node": "Build Log Row",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Expected Result mapping": {
+      "main": [
+        [
+          {
+            "node": "Append row in sheet",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge2": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Items1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Final Decision HTTP Body": {
+      "main": [
+        [
+          {
+            "node": "LPN Review",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge3": {
+      "main": [
+        [
+          {
+            "node": "Prepare Final Decision HTTP Body",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Carry Event Meta": {
+      "main": [
+        [
+          {
+            "node": "Merge3",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Wildcard post-processing": {
+      "main": [
+        [
+          {
+            "node": "Normalize",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false
+  },
+  "versionId": "f4cb9f9a-7d44-4359-ae42-c96869889b75",
+  "meta": {
+    "instanceId": "70105cd159f1712be91b4c81e323ebe864d2013780db89b2c3ff3da04adb16fe"
+  },
+  "id": "DwXbw5OYXevEeWmx",
+  "tags": []
+}

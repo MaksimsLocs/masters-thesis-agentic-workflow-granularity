@@ -1,0 +1,19 @@
+{
+  "name": "Weekly Sales Workflow v1.6.1",
+  "nodes": [],
+  "pinData": {},
+  "connections": {},
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false
+  },
+  "versionId": "e963396e-b169-4498-bd24-11806ffd3800",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "70105cd159f1712be91b4c81e323ebe864d2013780db89b2c3ff3da04adb16fe"
+  },
+  "id": "LfAyQwTanU5pBASh",
+  "tags": []
+}

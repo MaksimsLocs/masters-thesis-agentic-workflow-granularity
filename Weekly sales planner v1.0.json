@@ -1,0 +1,324 @@
+{
+  "name": "Weekly sales planner v1.0",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 0 8 * * 5"
+            },
+            {}
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        -1456,
+        -16
+      ],
+      "id": "098c482d-a075-439f-99d7-3399d137de23",
+      "name": "Schedule Trigger"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Helper function to format date as YYYY-MM-DD in Riga timezone\nfunction formatDate(date) {\n  return date.toLocaleString('sv-SE', {\n    timeZone: 'Europe/Riga',\n    day: '2-digit',\n    month: '2-digit',\n    year: 'numeric',\n  }).split(' ')[0];\n}\n\n// Get current date in Riga timezone\nconst now = new Date(new Date().toLocaleString('en-US', { timeZone: 'Europe/Riga' }));\n\n// Find next Monday\nconst currentDay = now.getDay(); // 0 (Sun) to 6 (Sat)\nconst daysUntilNextMonday = ((8 - currentDay) % 7) || 7;\nconst nextMonday = new Date(now);\nnextMonday.setDate(now.getDate() + daysUntilNextMonday);\n\n// Next Friday after the found Monday\nconst nextFriday = new Date(nextMonday);\nnextFriday.setDate(nextMonday.getDate() + 4);\n\nreturn [{\n  nextMon: formatDate(nextMonday),\n  nextFri: formatDate(nextFriday)\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -1056,
+        -16
+      ],
+      "id": "45692b71-cae6-4e0b-9261-c23993672a55",
+      "name": "Next Monday -> Next Friday"
+    },
+    {
+      "parameters": {
+        "operation": "getAll",
+        "docType": "={{ 'ToDo' }}",
+        "returnAll": true,
+        "options": {
+          "filters": {
+            "customProperty": [
+              {
+                "field": "=status",
+                "value": "Open"
+              },
+              {
+                "field": "=allocated_to",
+                "value": "edgars.porietis@biss.lv"
+              },
+              {
+                "field": "=date",
+                "operator": "equalsGreater",
+                "value": "=2026-03-01"
+              },
+              {
+                "field": "=date",
+                "operator": "equalsLess",
+                "value": "={{ $json.nextFri }}"
+              }
+            ]
+          }
+        }
+      },
+      "type": "n8n-nodes-base.erpNext",
+      "typeVersion": 1,
+      "position": [
+        -656,
+        -16
+      ],
+      "id": "196dc168-d617-4414-bb22-bdfcc95e4190",
+      "name": "Get many documents",
+      "credentials": {
+        "erpNextApi": {
+          "id": "FKYgfWUfBEaUBaF5",
+          "name": "ERPNext BISS"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ $json.data }}",
+        "options": {
+          "systemMessage": "=ROLE\nYou are **WeekPlannerBot**, a tool-calling agent.\n\nINPUT SHAPE\nThe agent always receives **one** item like:\n{\n  \"data\": [\n    {\n      \"status\":      \"Open\",\n      \"priority\":    \"High\" | \"Medium\" | \"Low\",\n      \"date\":        \"YYYY-MM-DD\",        // due date\n      \"allocated_to\":\"user@company.com\",  // always the SAME person\n      \"description\": \"<div …>Human text …</div>\" // contains HTML\n    },\n    …\n  ]\n}\nThe array length varies week to week.\n\nTOOLS\n1. send_email  \n   • message :string  plain-text body (node already knows To + Subject)\n\n2. create_event  \n   • title  :string ≤ 8-word summary taken from description  \n   • start  :YYYY-MM-DDTHH:MM always 05:00 on task.date  \n   • end    :YYYY-MM-DDTHH:MM always 05:15 on task.date\n\nTASK\n1. For each object in **data**  \n   – Strip all HTML from *description*.  \n   – Generate a concise **title** (≤ 8 words).  \n   – Determine the weekday (Monday-Friday) from *date*.\n\n2. Build **one plain-text digest** covering Monday → Friday, always listing every day.  \n   Example format:  \nMonday (2025-08-11)\n• <title> — [<priority>] — https://erpnext.biss.lv/app/todo/<name>\n\nTuesday (2025-08-12)\n• <title> — [<priority>] — https://erpnext.biss.lv/app/todo/<name>\n• <title> — [<priority>] — https://erpnext.biss.lv/app/todo/<name>\n• <title> — [<priority>] — https://erpnext.biss.lv/app/todo/<name>\n\nWednesday (2025-08-13)\n• <title> — [<priority>] — https://erpnext.biss.lv/app/todo/<name>\n• <title> — [<priority>] — https://erpnext.biss.lv/app/todo/<name>\n\nThursday (2025-08-14)\n• — no tasks —\n\nFriday (2025-08-15)\n• <title> — [<priority>] — https://erpnext.biss.lv/app/todo/<name>\n\n   ‣ Use “— no tasks —” for empty days.  \n   ‣ Double line-break between days.\n\n3. **send_email** — call exactly once with the digest in `message`.\n\n4. **create_event** — call once per task with fields:\n   { \"title\", \"start\", \"end\" } using the fixed 05:00-05:15 slot.\n\nCONSTRAINTS\n• One `send_email` call total.  \n• One `create_event` call per task.\n• **Numeric parity:**  \n  – Let N = length of input array `data`.  \n  – Your output must contain **N + 2 tool calls in total**  \n    (1 `send_email` + N `create_event`).  \n  – If the counts don’t match, rebuild the tool list before returning.  \n•  **Throttle**: wait **1 second** between successive `create_event` calls (sequential emission, no batching).\n• Output ONLY tool invocations (no explanatory text).  \n• Keep the order: first the single send_email call, then all create_event calls.\n\n\n\nOUTPUT\nReturn a JSON array",
+          "maxIterations": 50
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 2,
+      "position": [
+        384,
+        -48
+      ],
+      "id": "a5eec3fd-bb3e-4a0f-962e-732904992aa6",
+      "name": "AI Agent"
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "value": "gpt-4o",
+          "mode": "list",
+          "cachedResultName": "gpt-4o"
+        },
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.2,
+      "position": [
+        304,
+        384
+      ],
+      "id": "8ba850f1-97c8-400a-873b-fcf905554987",
+      "name": "OpenAI Chat Model",
+      "credentials": {
+        "openAiApi": {
+          "id": "DGMKhtjWiud3t6nI",
+          "name": "GPT_Credentials"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "aggregate": "aggregateAllItemData",
+        "include": "specifiedFields",
+        "fieldsToInclude": "name, status, priority, date, allocated_to, description",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.aggregate",
+      "typeVersion": 1,
+      "position": [
+        0,
+        -48
+      ],
+      "id": "0b493785-b379-40ad-ae28-d33266ad7e4a",
+      "name": "Aggregate"
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "docType": "={{ 'ToDo' }}",
+        "documentName": "={{ $json.name }}"
+      },
+      "type": "n8n-nodes-base.erpNext",
+      "typeVersion": 1,
+      "position": [
+        -336,
+        -16
+      ],
+      "id": "bf28e4a3-70bc-424e-a801-cd4e0bdedd74",
+      "name": "Get a document",
+      "credentials": {
+        "erpNextApi": {
+          "id": "FKYgfWUfBEaUBaF5",
+          "name": "ERPNext BISS"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "toRecipients": "=maksims.locs@biss.lv",
+        "subject": "=To do tasks (Time period: {{ $('Next Monday -> Next Friday').item.json.nextMon }} - {{ $('Next Monday -> Next Friday').item.json.nextFri }})",
+        "bodyContent": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('Message', ``, 'string') }}",
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.microsoftOutlookTool",
+      "typeVersion": 2,
+      "position": [
+        528,
+        384
+      ],
+      "id": "3ec06c97-5962-4943-827b-666936a3085b",
+      "name": "send_email",
+      "webhookId": "96f5bc4d-5228-43da-99b3-8219689f62e4",
+      "credentials": {
+        "microsoftOutlookOAuth2Api": {
+          "id": "2zMiILm1BsBP2NdN",
+          "name": "Microsoft Outlook account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "resource": "event",
+        "operation": "create",
+        "calendarId": {
+          "__rl": true,
+          "value": "AQMkADE4MWMwMjNmLWE3MGItNGE3Yi05MGQ3LTRlZjNlNTI3YzdiYwBGAAADH-465xBQvU_E32qZzpGSrAcAGSmuAt839EWeL23iy1n0rQAAAgEGAAAAGSmuAt839EWeL23iy1n0rQAAAp-OAAAA",
+          "mode": "list",
+          "cachedResultName": "Calendar"
+        },
+        "subject": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('Title', ``, 'string') }}",
+        "startDateTime": "={{ $fromAI('Start', ``, 'string') }}",
+        "endDateTime": "={{ $fromAI('End', ``, 'string') }}",
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.microsoftOutlookTool",
+      "typeVersion": 2,
+      "position": [
+        768,
+        384
+      ],
+      "id": "73b6d322-3522-4c31-b610-d0ea4599a30b",
+      "name": "create_event",
+      "webhookId": "0a237699-e552-4a95-947c-c3a1c1981d8e",
+      "retryOnFail": true,
+      "credentials": {
+        "microsoftOutlookOAuth2Api": {
+          "id": "2zMiILm1BsBP2NdN",
+          "name": "Microsoft Outlook account 2"
+        }
+      },
+      "onError": "continueRegularOutput"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Schedule Trigger": {
+      "main": [
+        [
+          {
+            "node": "Next Monday -> Next Friday",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Next Monday -> Next Friday": {
+      "main": [
+        [
+          {
+            "node": "Get many documents",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get many documents": {
+      "main": [
+        [
+          {
+            "node": "Get a document",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Aggregate": {
+      "main": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get a document": {
+      "main": [
+        [
+          {
+            "node": "Aggregate",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "send_email": {
+      "ai_tool": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "create_event": {
+      "ai_tool": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false
+  },
+  "versionId": "8e077155-a139-4dd5-ac1f-070e3faa91f7",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "70105cd159f1712be91b4c81e323ebe864d2013780db89b2c3ff3da04adb16fe"
+  },
+  "id": "AQ0Kl1YCOtj8D8w1",
+  "tags": []
+}

@@ -1,0 +1,2645 @@
+{
+  "name": "Weekly sales planner v1.2",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 0 8 * * 5"
+            },
+            {}
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        -7536,
+        6960
+      ],
+      "id": "e0c567b4-367d-4a42-a143-941db9b5e305",
+      "name": "Schedule Trigger"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Helper function to format date as YYYY-MM-DD in Riga timezone\nfunction formatDate(date) {\n  return date.toLocaleString('sv-SE', {\n    timeZone: 'Europe/Riga',\n    day: '2-digit',\n    month: '2-digit',\n    year: 'numeric',\n  }).split(' ')[0];\n}\n\n// Get current date in Riga timezone\nconst now = new Date(new Date().toLocaleString('en-US', { timeZone: 'Europe/Riga' }));\n\n// Find next Monday\nconst currentDay = now.getDay(); // 0 (Sun) to 6 (Sat)\nconst daysUntilNextMonday = ((8 - currentDay) % 7) || 7;\nconst nextMonday = new Date(now);\nnextMonday.setDate(now.getDate() + daysUntilNextMonday);\n\n// Next Friday after the found Monday\nconst nextFriday = new Date(nextMonday);\nnextFriday.setDate(nextMonday.getDate() + 4);\n\nreturn [{\n  nextMon: formatDate(nextMonday),\n  nextFri: formatDate(nextFriday)\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -7136,
+        6960
+      ],
+      "id": "a0b7831b-2f4d-491c-9f77-33fb626eb887",
+      "name": "Next Monday -> Next Friday"
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "mode": "list",
+          "value": "gpt-4.1-mini"
+        },
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.2,
+      "position": [
+        -5600,
+        7472
+      ],
+      "id": "3cf29457-d254-4b6d-9465-1cf8e51bfa4e",
+      "name": "OpenAI Chat Model"
+    },
+    {
+      "parameters": {
+        "aggregate": "aggregateAllItemData",
+        "include": "specifiedFields",
+        "fieldsToInclude": "name, status, priority, date, allocated_to, description",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.aggregate",
+      "typeVersion": 1,
+      "position": [
+        -6080,
+        6960
+      ],
+      "id": "5ea956d5-c9a8-4fce-82a2-168f561d9256",
+      "name": "Aggregate"
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "docType": "={{ 'ToDo' }}",
+        "documentName": "={{ $json.name }}"
+      },
+      "type": "n8n-nodes-base.erpNext",
+      "typeVersion": 1,
+      "position": [
+        -6416,
+        6960
+      ],
+      "id": "05413505-2d09-423b-b48a-5e6531e5459a",
+      "name": "Get a document"
+    },
+    {
+      "parameters": {
+        "toRecipients": "=",
+        "subject": "=To do tasks (Time period: {{ $('Next Monday -> Next Friday').item.json.nextMon }} - {{ $('Next Monday -> Next Friday').item.json.nextFri }})",
+        "bodyContent": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('Message', ``, 'string') }}",
+        "additionalFields": {
+          "bodyContentType": "html"
+        }
+      },
+      "type": "n8n-nodes-base.microsoftOutlookTool",
+      "typeVersion": 2,
+      "position": [
+        -5280,
+        7472
+      ],
+      "id": "686b0018-1b7c-48ac-b4df-08ea2a8c5dbc",
+      "name": "send_email",
+      "webhookId": "2fb7e155-663e-4f2f-a099-7dfb315a92db",
+      "credentials": {
+        "microsoftOutlookOAuth2Api": {
+          "id": "2zMiILm1BsBP2NdN",
+          "name": "Microsoft Outlook account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "fieldToSplitOut": "data",
+        "include": "selectedOtherFields",
+        "fieldsToInclude": "name, status, date, allocated_to, description",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.splitOut",
+      "typeVersion": 1,
+      "position": [
+        -5792,
+        6608
+      ],
+      "id": "95a76abf-77d8-4e20-b29a-f5aa61ba84d3",
+      "name": "Split Out"
+    },
+    {
+      "parameters": {
+        "jsCode": "const strip = s => (s ?? '').replace(/<[^>]*>/g, ' ').replace(/\\s+/g, ' ').trim();\n\nconst d = $json.data || {};\nconst clean = strip(d.description).slice(0, 200);\n\nreturn [{\n  json: {\n    ...$json,\n    data: { ...d, description_clean: clean }\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -5312,
+        6640
+      ],
+      "id": "cc0bd51f-b86d-4aef-9c65-1412049db679",
+      "name": "Code"
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        -5568,
+        6608
+      ],
+      "id": "0237e802-baf8-49a2-9dcf-f6fdce14d7ff",
+      "name": "Loop Over Items"
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "mode": "list",
+          "value": "gpt-4.1-mini"
+        },
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.2,
+      "position": [
+        -5072,
+        6976
+      ],
+      "id": "57610d3d-d093-47ae-ad6f-78a98f24b5c5",
+      "name": "OpenAI Chat Model1"
+    },
+    {
+      "parameters": {
+        "jsonSchemaExample": "{\n\t\"title\": \"Meeting with Sydesol - https://erpnext.biss.lv/app/todo/0lbht1i143\"\n\t\n}"
+      },
+      "type": "@n8n/n8n-nodes-langchain.outputParserStructured",
+      "typeVersion": 1.3,
+      "position": [
+        -4800,
+        6960
+      ],
+      "id": "71f2e217-b378-4f42-abd6-b60cf83a53f9",
+      "name": "Structured Output Parser"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Combine item 0 (data) and item 1 (output)\nconst arr = $items().map(i => i.json);\nconst task = (arr.find(i => i.data) || {}).data || {};\nlet out = (arr.find(i => i.output) || {}).output;\n\nif (typeof out === 'string') { try { out = JSON.parse(out); } catch {} }\n\nreturn [{\n  title: String(out?.title || '').trim(),\n  start: `${task.date}T05:00`,\n  end:   `${task.date}T05:15`\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -4288,
+        6656
+      ],
+      "id": "8eef6413-4154-4412-a6bc-72e1ef068e21",
+      "name": "Prepare event"
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        -4576,
+        6656
+      ],
+      "id": "d8d24107-fbdb-4e3e-a53b-7bd6155ab3ec",
+      "name": "Merge"
+    },
+    {
+      "parameters": {
+        "resource": "event",
+        "operation": "create",
+        "calendarId": {
+          "__rl": true,
+          "value": "AQMkADE4MWMwMjNmLWE3MGItNGE3Yi05MGQ3LTRlZjNlNTI3YzdiYwBGAAADH-465xBQvU_E32qZzpGSrAcAGSmuAt839EWeL23iy1n0rQAAAgEGAAAAGSmuAt839EWeL23iy1n0rQAAAp-OAAAA",
+          "mode": "list",
+          "cachedResultName": "Calendar"
+        },
+        "subject": "={{ $json.title }}",
+        "startDateTime": "={{ $json.start }}",
+        "endDateTime": "={{ $json.end }}",
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.microsoftOutlook",
+      "typeVersion": 2,
+      "position": [
+        -4000,
+        6656
+      ],
+      "id": "dcfd8606-b009-4146-affc-c8c31d8374ff",
+      "name": "Create an event",
+      "webhookId": "02a0bf1d-8d19-4f77-baf9-f74d6270c817"
+    },
+    {
+      "parameters": {
+        "amount": 1
+      },
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        -3776,
+        6656
+      ],
+      "id": "0d5e5901-eecb-4336-96dd-34f8b2dbb6be",
+      "name": "Wait",
+      "webhookId": "31f51d95-3fb9-4f42-9576-023e5c96b8ec"
+    },
+    {
+      "parameters": {
+        "operation": "getAll",
+        "docType": "={{ 'ToDo' }}",
+        "returnAll": true,
+        "options": {
+          "filters": {
+            "customProperty": [
+              {
+                "field": "=status",
+                "value": "Open"
+              },
+              {
+                "field": "=allocated_to"
+              },
+              {
+                "field": "=date",
+                "operator": "equalsGreater",
+                "value": "={{ $json.nextMon }}"
+              },
+              {
+                "field": "=date",
+                "operator": "equalsLess",
+                "value": "={{ $json.nextFri }}"
+              }
+            ]
+          }
+        }
+      },
+      "type": "n8n-nodes-base.erpNext",
+      "typeVersion": 1,
+      "position": [
+        -6768,
+        6960
+      ],
+      "id": "ed0616b5-0031-4a0c-82ca-8b3beb20c608",
+      "name": "Get many documents",
+      "credentials": {
+        "erpNextApi": {
+          "id": "FKYgfWUfBEaUBaF5",
+          "name": "ERPNext BISS"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=name: {{ $json.data.name }}\ndescription_clean: {{ $json.data.description_clean }}",
+        "hasOutputParser": true,
+        "options": {
+          "systemMessage": "Return a short, human-readable title from the provided sanitized text.\nRules: ≤ 8 words, plain text, no quotes, no punctuation, no emojis.\nIf text is empty, use a generic action like \"Follow up task\".\nadd to the title \"- https://erpnext.biss.lv/app/todo/<name>\"\nRespond ONLY as JSON matching the required schema."
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 2,
+      "position": [
+        -5040,
+        6688
+      ],
+      "id": "5edba991-0774-429d-becc-1af99b0729a3",
+      "name": "AI Title Generator"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ JSON.stringify($json) }}\n",
+        "options": {
+          "systemMessage": "=ROLE\nYou are WeekPlannerBot. You will receive ONE JSON object for a single salesperson’s next-week tasks:\n\nINPUT SHAPE\n{\n  \"weekTotal\": number,\n  \"days\": [\n    {\n      \"label\": \"Monday\" | \"Tuesday\" | \"Wednesday\" | \"Thursday\" | \"Friday\",\n      \"date\": \"YYYY-MM-DD\",\n      \"total\": number,\n      \"items\": [\n        { \"n\": number, \"name\": \"TODO-ID\", \"priority\": \"High|Medium|Low\", \"desc\": \"plain text\" }\n      ]\n    }\n  ]\n}\n\nTOOLS\nsend_email\n  • message : string   // HTML body only; To & Subject are set in the node\n\nTASK\nCompose ONE HTML email using the provided counts and indices exactly as given.\n\nFormatting rules (Outlook-safe, minimal inline styles):\n1) Weekly total (first line):\n   <p><strong>Total open tasks this week: [weekTotal]</strong></p>\n\n2) For each day in the given order (days[0]..days[4]):\n   • Day header line reformatting the ISO date to “MonthName DD, YYYY”:\n     <h3 style=\"margin:0 0 6px 0;\">[label], [MonthName from date] [DD], [YYYY] — [total] tasks</h3>\n\n   • If total == 0:\n     <p>— no tasks —</p>\n\n   • If total > 0:\n     Produce an ordered list, items sorted by their n value (ascending):\n     <ol start=\"1\" style=\"margin:0 0 14px 22px; padding:0;\">\n       For each item:\n         - Shorten the description from item.desc using this rule:\n           * Trim spaces.\n           * Limit to the first 8 words OR 80 characters (whichever comes first).\n           * Do not cut in the middle of a word.\n           * If truncated, append an ellipsis character (…).\n         - Then output one list item:\n           <li style=\"margin:0 0 4px 0;\">[short desc] — [ [priority] ] — <a href=\"https://erpnext.biss.lv/app/todo/[name]\">open</a></li>\n     </ol>\n\n   • Add a thin spacer after each day block:\n     <div style=\"height:8px;\"></div>\n\nCONSTRAINTS\n• Use weekTotal and each day.total exactly as provided; do not recalculate.\n• Preserve item order by their n field; do not renumber. The HTML <ol> numbering must match 1..N by that order.\n• Produce exactly ONE tool call: send_email with the complete HTML body in the message field.\n• Do not include markdown or any templating syntax. Output only valid HTML inside the tool call.\n\nOUTPUT\nReturn a single-element JSON array\n\n",
+          "maxIterations": 3
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 2,
+      "position": [
+        -5552,
+        7136
+      ],
+      "id": "7510b3b1-8a9b-412c-9b3b-af9854cf2f56",
+      "name": "AI E-mail Sender"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Helpers\nconst strip = s => (s || '').replace(/<[^>]*>/g, ' ').replace(/\\s+/g, ' ').trim();\nconst fmt = d => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;\n\n// Input (KEEP name)\nconst tasks = ($json.data || []).map(t => ({\n  name: t.name,                // <-- needed for link\n  date: t.date,\n  priority: t.priority,\n  desc: strip(t.description).slice(0, 200)\n}));\n\nif (!tasks.length) return [{ json: { weekTotal: 0, days: [] } }];\n\n// Find Monday of that week\nconst minDateStr = tasks.map(t => t.date).sort()[0];\nconst base = new Date(`${minDateStr}T00:00:00`);\nconst dow = base.getDay();                 // 0 Sun..6 Sat\nbase.setDate(base.getDate() - ((dow + 6) % 7));\n\n// Build Mon→Fri skeleton\n/** @type {{label:string,date:string,total:number,items:Array<any>}[]} */\nconst days = ['Monday','Tuesday','Wednesday','Thursday','Friday'].map((label, i) => {\n  const d = new Date(base); d.setDate(base.getDate() + i);\n  return { label, date: fmt(d), total: 0, items: /** @type {any[]} */([]) };\n});\n\n// Group + pre-number\nfor (const t of tasks) {\n  const bucket = days.find(x => x.date === t.date);\n  if (!bucket) continue;\n  const n = bucket.items.length + 1;\n  bucket.items.push({\n    n,                    // numbering to print\n    name: t.name,         // <-- keep name\n    priority: t.priority,\n    desc: t.desc\n  });\n  bucket.total++;\n}\n\nreturn [{ json: { weekTotal: tasks.length, days } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -5888,
+        7136
+      ],
+      "id": "9b81f3d8-a1ee-4554-943e-b54506a0156b",
+      "name": "Code1"
+    }
+  ],
+  "pinData": {
+    "Get a document": [
+      {
+        "json": {
+          "name": "0lbht1i143",
+          "owner": "Rihards.Capkovskis@biss.lv",
+          "creation": "2025-08-07 13:30:28.366671",
+          "modified": "2025-08-07 13:30:28.366671",
+          "modified_by": "Rihards.Capkovskis@biss.lv",
+          "docstatus": 0,
+          "idx": 0,
+          "status": "Open",
+          "priority": "Low",
+          "date": "2025-08-12",
+          "allocated_to": "Rihards.Capkovskis@biss.lv",
+          "description": "<div class=\"ql-editor read-mode\"><p>Will have meeting with sydesol</p></div>",
+          "reference_type": "Regular Opportunity",
+          "reference_name": "REG-OPP-000599",
+          "assigned_by": "Rihards.Capkovskis@biss.lv",
+          "assigned_by_full_name": "Rihards Čapkovskis",
+          "doctype": "ToDo"
+        }
+      },
+      {
+        "json": {
+          "name": "14sds5jmmi",
+          "owner": "Rihards.Capkovskis@biss.lv",
+          "creation": "2025-03-12 14:48:01.165138",
+          "modified": "2025-08-06 14:26:41.713641",
+          "modified_by": "Rihards.Capkovskis@biss.lv",
+          "docstatus": 0,
+          "idx": 0,
+          "status": "Open",
+          "priority": "Low",
+          "date": "2025-08-13",
+          "allocated_to": "Rihards.Capkovskis@biss.lv",
+          "description": "Enity",
+          "reference_type": "Leads",
+          "reference_name": "LEADS-001339",
+          "assigned_by": "Rihards.Capkovskis@biss.lv",
+          "assigned_by_full_name": "Rihards Čapkovskis",
+          "doctype": "ToDo"
+        }
+      },
+      {
+        "json": {
+          "name": "2kolf3dgqc",
+          "owner": "Rihards.Capkovskis@biss.lv",
+          "creation": "2025-05-20 14:28:53.660257",
+          "modified": "2025-08-04 15:57:29.493001",
+          "modified_by": "Rihards.Capkovskis@biss.lv",
+          "docstatus": 0,
+          "idx": 0,
+          "status": "Open",
+          "priority": "Low",
+          "date": "2025-08-14",
+          "allocated_to": "Rihards.Capkovskis@biss.lv",
+          "description": "<div class=\"ql-editor read-mode\"><p>Follow up with him regarding meeting </p></div>",
+          "reference_type": "Leads",
+          "reference_name": "ELEKTROAVTOMATIKA 2005 LTD",
+          "assigned_by": "Rihards.Capkovskis@biss.lv",
+          "assigned_by_full_name": "Rihards Čapkovskis",
+          "doctype": "ToDo"
+        }
+      },
+      {
+        "json": {
+          "name": "2mg20smsdh",
+          "owner": "Rihards.Capkovskis@biss.lv",
+          "creation": "2025-06-05 10:57:21.666751",
+          "modified": "2025-08-07 14:24:37.905161",
+          "modified_by": "Rihards.Capkovskis@biss.lv",
+          "docstatus": 0,
+          "idx": 0,
+          "status": "Open",
+          "priority": "Low",
+          "date": "2025-08-12",
+          "allocated_to": "Rihards.Capkovskis@biss.lv",
+          "description": "<div class=\"ql-editor read-mode\"><p>Parking project </p></div>",
+          "reference_type": "Regular Opportunity",
+          "reference_name": "REG-OPP-000563",
+          "assigned_by": "Rihards.Capkovskis@biss.lv",
+          "assigned_by_full_name": "Rihards Čapkovskis",
+          "doctype": "ToDo"
+        }
+      },
+      {
+        "json": {
+          "name": "2q2v3u7a81",
+          "owner": "Rihards.Capkovskis@biss.lv",
+          "creation": "2025-03-10 13:09:18.263415",
+          "modified": "2025-08-05 08:32:32.573439",
+          "modified_by": "Rihards.Capkovskis@biss.lv",
+          "docstatus": 0,
+          "idx": 0,
+          "status": "Open",
+          "priority": "Medium",
+          "date": "2025-08-12",
+          "allocated_to": "Rihards.Capkovskis@biss.lv",
+          "description": "<div class=\"ql-editor read-mode\"><p>Follow up with Noel regarding the responsible person for the communication with AVS</p></div>",
+          "reference_type": "Leads",
+          "reference_name": "LEADS-001196",
+          "assigned_by": "Rihards.Capkovskis@biss.lv",
+          "assigned_by_full_name": "Rihards Čapkovskis",
+          "doctype": "ToDo"
+        }
+      },
+      {
+        "json": {
+          "name": "2sii4teif0",
+          "owner": "Rihards.Capkovskis@biss.lv",
+          "creation": "2025-05-19 15:43:58.621454",
+          "modified": "2025-08-08 15:47:14.682434",
+          "modified_by": "Rihards.Capkovskis@biss.lv",
+          "docstatus": 0,
+          "idx": 0,
+          "status": "Open",
+          "priority": "Low",
+          "date": "2025-08-14",
+          "allocated_to": "Rihards.Capkovskis@biss.lv",
+          "description": "<div class=\"ql-editor read-mode\"><p>Follow up is there response or drop it </p></div>",
+          "reference_type": "Leads",
+          "reference_name": "LEADS-001182",
+          "assigned_by": "Rihards.Capkovskis@biss.lv",
+          "assigned_by_full_name": "Rihards Čapkovskis",
+          "doctype": "ToDo"
+        }
+      },
+      {
+        "json": {
+          "name": "2vlje4p9s8",
+          "owner": "Rihards.Capkovskis@biss.lv",
+          "creation": "2025-04-03 13:48:56.523980",
+          "modified": "2025-08-07 14:25:18.399633",
+          "modified_by": "Rihards.Capkovskis@biss.lv",
+          "docstatus": 0,
+          "idx": 0,
+          "status": "Open",
+          "priority": "Low",
+          "date": "2025-08-12",
+          "allocated_to": "Rihards.Capkovskis@biss.lv",
+          "description": "<div class=\"ql-editor read-mode\"><p>Follow up with progress of Rolf</p></div>",
+          "reference_type": "Leads",
+          "reference_name": "LEADS-001617",
+          "assigned_by": "Rihards.Capkovskis@biss.lv",
+          "assigned_by_full_name": "Rihards Čapkovskis",
+          "doctype": "ToDo"
+        }
+      },
+      {
+        "json": {
+          "name": "3d7aa4dss2",
+          "owner": "Rihards.Capkovskis@biss.lv",
+          "creation": "2025-04-07 11:34:50.355724",
+          "modified": "2025-08-07 15:47:47.162969",
+          "modified_by": "Rihards.Capkovskis@biss.lv",
+          "docstatus": 0,
+          "idx": 0,
+          "status": "Open",
+          "priority": "Low",
+          "date": "2025-08-14",
+          "allocated_to": "Rihards.Capkovskis@biss.lv",
+          "description": "<div class=\"ql-editor read-mode\"><p>Arsann meeting </p></div>",
+          "reference_type": "Leads",
+          "reference_name": "LEADS-001647",
+          "assigned_by": "Rihards.Capkovskis@biss.lv",
+          "assigned_by_full_name": "Rihards Čapkovskis",
+          "doctype": "ToDo"
+        }
+      },
+      {
+        "json": {
+          "name": "46prrptdq0",
+          "owner": "Rihards.Capkovskis@biss.lv",
+          "creation": "2025-07-07 10:18:58.528043",
+          "modified": "2025-07-24 10:38:01.265862",
+          "modified_by": "Rihards.Capkovskis@biss.lv",
+          "docstatus": 0,
+          "idx": 0,
+          "status": "Open",
+          "priority": "Low",
+          "date": "2025-08-11",
+          "allocated_to": "Rihards.Capkovskis@biss.lv",
+          "description": "<div class=\"ql-editor read-mode\"><p>Follow up with Sensit City regarding the decision process</p></div>",
+          "reference_type": "Regular Opportunity",
+          "reference_name": "REG-OPP-000610",
+          "assigned_by": "Rihards.Capkovskis@biss.lv",
+          "assigned_by_full_name": "Rihards Čapkovskis",
+          "doctype": "ToDo"
+        }
+      },
+      {
+        "json": {
+          "name": "4cbld2d33a",
+          "owner": "Rihards.Capkovskis@biss.lv",
+          "creation": "2025-04-01 09:58:21.893254",
+          "modified": "2025-07-11 15:10:06.261600",
+          "modified_by": "Rihards.Capkovskis@biss.lv",
+          "docstatus": 0,
+          "idx": 0,
+          "status": "Open",
+          "priority": "Medium",
+          "date": "2025-08-11",
+          "allocated_to": "Rihards.Capkovskis@biss.lv",
+          "description": "<div class=\"ql-editor read-mode\"><p>Follow up on my message </p></div>",
+          "reference_type": "Leads",
+          "reference_name": "CRM-LEAD-2024-00141",
+          "assigned_by": "Rihards.Capkovskis@biss.lv",
+          "assigned_by_full_name": "Rihards Čapkovskis",
+          "doctype": "ToDo"
+        }
+      },
+      {
+        "json": {
+          "name": "4r0u4569tc",
+          "owner": "Rihards.Capkovskis@biss.lv",
+          "creation": "2025-05-30 08:28:16.055315",
+          "modified": "2025-08-04 15:37:28.982536",
+          "modified_by": "Rihards.Capkovskis@biss.lv",
+          "docstatus": 0,
+          "idx": 0,
+          "status": "Open",
+          "priority": "Low",
+          "date": "2025-08-13",
+          "allocated_to": "Rihards.Capkovskis@biss.lv",
+          "description": "<div class=\"ql-editor read-mode\"><p>Mall in Riyadh - Parking </p></div>",
+          "reference_type": "Regular Opportunity",
+          "reference_name": "REG-OPP-000545",
+          "assigned_by": "Rihards.Capkovskis@biss.lv",
+          "assigned_by_full_name": "Rihards Čapkovskis",
+          "doctype": "ToDo"
+        }
+      },
+      {
+        "json": {
+          "name": "4ut24nhnag",
+          "owner": "Rihards.Capkovskis@biss.lv",
+          "creation": "2025-03-21 11:45:19.709904",
+          "modified": "2025-08-06 10:38:30.687778",
+          "modified_by": "Rihards.Capkovskis@biss.lv",
+          "docstatus": 0,
+          "idx": 0,
+          "status": "Open",
+          "priority": "Low",
+          "date": "2025-08-15",
+          "allocated_to": "Rihards.Capkovskis@biss.lv",
+          "description": "King Salaman Park follow up on my questions",
+          "reference_type": "Regular Opportunity",
+          "reference_name": "REG-OPP-000364",
+          "assigned_by": "Rihards.Capkovskis@biss.lv",
+          "assigned_by_full_name": "Rihards Čapkovskis",
+          "doctype": "ToDo"
+        }
+      },
+      {
+        "json": {
+          "name": "5is220jjng",
+          "owner": "Rihards.Capkovskis@biss.lv",
+          "creation": "2025-04-07 11:38:33.285144",
+          "modified": "2025-06-11 13:30:28.223002",
+          "modified_by": "Rihards.Capkovskis@biss.lv",
+          "docstatus": 0,
+          "idx": 0,
+          "status": "Open",
+          "priority": "Low",
+          "date": "2025-08-13",
+          "allocated_to": "Rihards.Capkovskis@biss.lv",
+          "description": "<div class=\"ql-editor read-mode\"><p>Next Wave Technology</p></div>",
+          "reference_type": "Leads",
+          "reference_name": "LEADS-001645",
+          "assigned_by": "Rihards.Capkovskis@biss.lv",
+          "assigned_by_full_name": "Rihards Čapkovskis",
+          "doctype": "ToDo"
+        }
+      },
+      {
+        "json": {
+          "name": "5lbp9vio0l",
+          "owner": "Rihards.Capkovskis@biss.lv",
+          "creation": "2025-03-21 14:30:21.895303",
+          "modified": "2025-06-06 13:41:54.261352",
+          "modified_by": "Rihards.Capkovskis@biss.lv",
+          "docstatus": 0,
+          "idx": 0,
+          "status": "Open",
+          "priority": "Medium",
+          "date": "2025-08-11",
+          "allocated_to": "Rihards.Capkovskis@biss.lv",
+          "description": "Secure Parking",
+          "reference_type": "Leads",
+          "reference_name": "CRM-LEAD-2024-00118",
+          "assigned_by": "Rihards.Capkovskis@biss.lv",
+          "assigned_by_full_name": "Rihards Čapkovskis",
+          "doctype": "ToDo"
+        }
+      },
+      {
+        "json": {
+          "name": "5libtmitmn",
+          "owner": "Rihards.Capkovskis@biss.lv",
+          "creation": "2025-05-10 08:48:27.415458",
+          "modified": "2025-08-06 09:34:04.612391",
+          "modified_by": "Rihards.Capkovskis@biss.lv",
+          "docstatus": 0,
+          "idx": 0,
+          "status": "Open",
+          "priority": "Low",
+          "date": "2025-08-12",
+          "allocated_to": "Rihards.Capkovskis@biss.lv",
+          "description": "<div class=\"ql-editor read-mode\"><p>Follow up with him regarding the potential projects </p></div>",
+          "reference_type": "Leads",
+          "reference_name": "advanced-technology",
+          "assigned_by": "Rihards.Capkovskis@biss.lv",
+          "assigned_by_full_name": "Rihards Čapkovskis",
+          "doctype": "ToDo"
+        }
+      },
+      {
+        "json": {
+          "name": "6v3aan8e86",
+          "owner": "Rihards.Capkovskis@biss.lv",
+          "creation": "2025-05-30 15:48:48.387208",
+          "modified": "2025-08-08 16:09:38.261260",
+          "modified_by": "Rihards.Capkovskis@biss.lv",
+          "docstatus": 0,
+          "idx": 0,
+          "status": "Open",
+          "priority": "Medium",
+          "date": "2025-08-14",
+          "allocated_to": "Rihards.Capkovskis@biss.lv",
+          "description": "<div class=\"ql-editor read-mode\"><p>Connect with Aya to find out when do we cantinu the next action and when they will do the promest. </p><p><br></p><p>If no response connect with Hussam </p></div>",
+          "reference_type": "Leads",
+          "reference_name": "LEADS-001886",
+          "assigned_by": "Rihards.Capkovskis@biss.lv",
+          "assigned_by_full_name": "Rihards Čapkovskis",
+          "doctype": "ToDo"
+        }
+      },
+      {
+        "json": {
+          "name": "7nv8umt6su",
+          "owner": "Rihards.Capkovskis@biss.lv",
+          "creation": "2025-08-04 13:48:06.335656",
+          "modified": "2025-08-07 09:04:17.606383",
+          "modified_by": "Rihards.Capkovskis@biss.lv",
+          "docstatus": 0,
+          "idx": 0,
+          "status": "Open",
+          "priority": "Low",
+          "date": "2025-08-12",
+          "allocated_to": "Rihards.Capkovskis@biss.lv",
+          "description": "<div class=\"ql-editor read-mode\"><p>Meeting</p></div>",
+          "reference_type": "Leads",
+          "reference_name": "LEADS-001447",
+          "assigned_by": "Rihards.Capkovskis@biss.lv",
+          "assigned_by_full_name": "Rihards Čapkovskis",
+          "doctype": "ToDo"
+        }
+      },
+      {
+        "json": {
+          "name": "7sdbnbbs3p",
+          "owner": "Rihards.Capkovskis@biss.lv",
+          "creation": "2025-02-20 09:20:03.164817",
+          "modified": "2025-08-07 14:37:11.884092",
+          "modified_by": "Rihards.Capkovskis@biss.lv",
+          "docstatus": 0,
+          "idx": 0,
+          "status": "Open",
+          "priority": "Low",
+          "date": "2025-08-14",
+          "allocated_to": "Rihards.Capkovskis@biss.lv",
+          "description": "<div class=\"ql-editor read-mode\"><p>Follow up on if there any other opportunities we could help with </p></div>",
+          "reference_type": "Leads",
+          "reference_name": "LEADS-001316",
+          "assigned_by": "Rihards.Capkovskis@biss.lv",
+          "assigned_by_full_name": "Rihards Čapkovskis",
+          "doctype": "ToDo"
+        }
+      },
+      {
+        "json": {
+          "name": "8bs269h9ck",
+          "owner": "Rihards.Capkovskis@biss.lv",
+          "creation": "2025-02-24 13:15:06.655074",
+          "modified": "2025-07-10 11:37:39.224420",
+          "modified_by": "Rihards.Capkovskis@biss.lv",
+          "docstatus": 0,
+          "idx": 0,
+          "status": "Open",
+          "priority": "Low",
+          "date": "2025-08-12",
+          "allocated_to": "Rihards.Capkovskis@biss.lv",
+          "description": "<div class=\"ql-editor read-mode\"><p>Follow up on some possible pilot project possibilities </p></div>",
+          "reference_type": "Leads",
+          "reference_name": "LEADS-001275",
+          "assigned_by": "Rihards.Capkovskis@biss.lv",
+          "assigned_by_full_name": "Rihards Čapkovskis",
+          "doctype": "ToDo"
+        }
+      },
+      {
+        "json": {
+          "name": "8hlpo7bge0",
+          "owner": "Rihards.Capkovskis@biss.lv",
+          "creation": "2025-03-03 15:27:03.026713",
+          "modified": "2025-08-05 15:15:36.916547",
+          "modified_by": "Rihards.Capkovskis@biss.lv",
+          "docstatus": 0,
+          "idx": 0,
+          "status": "Open",
+          "priority": "Low",
+          "date": "2025-08-14",
+          "allocated_to": "Rihards.Capkovskis@biss.lv",
+          "description": "<div class=\"ql-editor read-mode\"><p>Follow up on the progress and the next action plan </p></div>",
+          "reference_type": "Leads",
+          "reference_name": "LEADS-001036",
+          "assigned_by": "Rihards.Capkovskis@biss.lv",
+          "assigned_by_full_name": "Rihards Čapkovskis",
+          "doctype": "ToDo"
+        }
+      },
+      {
+        "json": {
+          "name": "8mqm0fm40o",
+          "owner": "Rihards.Capkovskis@biss.lv",
+          "creation": "2025-04-07 11:43:53.039431",
+          "modified": "2025-07-11 15:09:54.500001",
+          "modified_by": "Rihards.Capkovskis@biss.lv",
+          "docstatus": 0,
+          "idx": 0,
+          "status": "Open",
+          "priority": "Low",
+          "date": "2025-08-11",
+          "allocated_to": "Rihards.Capkovskis@biss.lv",
+          "description": "<div class=\"ql-editor read-mode\"><p>Follow up on the message in whatsapp if no drop it </p></div>",
+          "reference_type": "Leads",
+          "reference_name": "CRM-LEAD-2024-00119",
+          "assigned_by": "Rihards.Capkovskis@biss.lv",
+          "assigned_by_full_name": "Rihards Čapkovskis",
+          "doctype": "ToDo"
+        }
+      },
+      {
+        "json": {
+          "name": "8n931o54im",
+          "owner": "Rihards.Capkovskis@biss.lv",
+          "creation": "2025-08-04 13:49:46.514219",
+          "modified": "2025-08-07 14:18:14.074983",
+          "modified_by": "Rihards.Capkovskis@biss.lv",
+          "docstatus": 0,
+          "idx": 0,
+          "status": "Open",
+          "priority": "Low",
+          "date": "2025-08-14",
+          "allocated_to": "Rihards.Capkovskis@biss.lv",
+          "description": "<div class=\"ql-editor read-mode\"><p>Integrated-PS Ein El Sokhna Port</p></div>",
+          "reference_type": "Regular Opportunity",
+          "reference_name": "REG-OPP-000539",
+          "assigned_by": "Rihards.Capkovskis@biss.lv",
+          "assigned_by_full_name": "Rihards Čapkovskis",
+          "doctype": "ToDo"
+        }
+      },
+      {
+        "json": {
+          "name": "9gesojdbmc",
+          "owner": "Rihards.Capkovskis@biss.lv",
+          "creation": "2025-03-21 14:36:55.845250",
+          "modified": "2025-08-06 10:06:05.594195",
+          "modified_by": "Rihards.Capkovskis@biss.lv",
+          "docstatus": 0,
+          "idx": 0,
+          "status": "Open",
+          "priority": "Low",
+          "date": "2025-08-14",
+          "allocated_to": "Rihards.Capkovskis@biss.lv",
+          "description": "<div class=\"ql-editor read-mode\"><p>Follow up with Noel regarding the project progress </p></div>",
+          "reference_type": "Regular Opportunity",
+          "reference_name": "REG-OPP-000299",
+          "assigned_by": "Rihards.Capkovskis@biss.lv",
+          "assigned_by_full_name": "Rihards Čapkovskis",
+          "doctype": "ToDo"
+        }
+      },
+      {
+        "json": {
+          "name": "9qipqrv2l7",
+          "owner": "Rihards.Capkovskis@biss.lv",
+          "creation": "2025-08-04 13:51:39.487274",
+          "modified": "2025-08-04 13:51:39.487274",
+          "modified_by": "Rihards.Capkovskis@biss.lv",
+          "docstatus": 0,
+          "idx": 0,
+          "status": "Open",
+          "priority": "Low",
+          "date": "2025-08-11",
+          "allocated_to": "Rihards.Capkovskis@biss.lv",
+          "description": "<div class=\"ql-editor read-mode\"><p>Follow up on the previous communication and define the main questions in the meeting </p></div>",
+          "reference_type": "Regular Opportunity",
+          "reference_name": "REG-OPP-000631",
+          "assigned_by": "Rihards.Capkovskis@biss.lv",
+          "assigned_by_full_name": "Rihards Čapkovskis",
+          "doctype": "ToDo"
+        }
+      },
+      {
+        "json": {
+          "name": "9v9g1loncv",
+          "owner": "Rihards.Capkovskis@biss.lv",
+          "creation": "2025-06-03 16:22:56.942549",
+          "modified": "2025-08-08 15:46:58.474598",
+          "modified_by": "Rihards.Capkovskis@biss.lv",
+          "docstatus": 0,
+          "idx": 0,
+          "status": "Open",
+          "priority": "Low",
+          "date": "2025-08-13",
+          "allocated_to": "Rihards.Capkovskis@biss.lv",
+          "description": "<div class=\"ql-editor read-mode\"><p>Follow up on my last email and connect with them to have solution meeting and prepare a folder for them to use for New muraba project </p></div>",
+          "reference_type": "Regular Opportunity",
+          "reference_name": "REG-OPP-000551",
+          "assigned_by": "Rihards.Capkovskis@biss.lv",
+          "assigned_by_full_name": "Rihards Čapkovskis",
+          "doctype": "ToDo"
+        }
+      },
+      {
+        "json": {
+          "name": "bv6b30tfbr",
+          "owner": "Rihards.Capkovskis@biss.lv",
+          "creation": "2025-03-11 10:37:43.855604",
+          "modified": "2025-07-15 10:09:59.365650",
+          "modified_by": "Rihards.Capkovskis@biss.lv",
+          "docstatus": 0,
+          "idx": 0,
+          "status": "Open",
+          "priority": "Low",
+          "date": "2025-08-12",
+          "allocated_to": "Rihards.Capkovskis@biss.lv",
+          "description": "<div class=\"ql-editor read-mode\"><p>Follow up whe we can do the meeting </p></div>",
+          "reference_type": "Leads",
+          "reference_name": "KOMCONTROL AD",
+          "assigned_by": "Rihards.Capkovskis@biss.lv",
+          "assigned_by_full_name": "Rihards Čapkovskis",
+          "doctype": "ToDo"
+        }
+      },
+      {
+        "json": {
+          "name": "chrl6rb2cn",
+          "owner": "Rihards.Capkovskis@biss.lv",
+          "creation": "2025-08-05 13:36:15.501680",
+          "modified": "2025-08-08 13:20:18.335055",
+          "modified_by": "Rihards.Capkovskis@biss.lv",
+          "docstatus": 0,
+          "idx": 0,
+          "status": "Open",
+          "priority": "Low",
+          "date": "2025-08-13",
+          "allocated_to": "Rihards.Capkovskis@biss.lv",
+          "description": "<div class=\"ql-editor read-mode\"><p>Goramp will send there technical offer</p></div>",
+          "reference_type": "Regular Opportunity",
+          "reference_name": "REG-OPP-000636",
+          "assigned_by": "Rihards.Capkovskis@biss.lv",
+          "assigned_by_full_name": "Rihards Čapkovskis",
+          "doctype": "ToDo"
+        }
+      },
+      {
+        "json": {
+          "name": "coklmlvqje",
+          "owner": "Rihards.Capkovskis@biss.lv",
+          "creation": "2025-08-05 14:31:13.991899",
+          "modified": "2025-08-05 14:31:13.991899",
+          "modified_by": "Rihards.Capkovskis@biss.lv",
+          "docstatus": 0,
+          "idx": 0,
+          "status": "Open",
+          "priority": "Low",
+          "date": "2025-08-15",
+          "allocated_to": "Rihards.Capkovskis@biss.lv",
+          "description": "<div class=\"ql-editor read-mode\"><p>Follow up on the project </p></div>",
+          "reference_type": "Regular Opportunity",
+          "reference_name": "REG-OPP-000632",
+          "assigned_by": "Rihards.Capkovskis@biss.lv",
+          "assigned_by_full_name": "Rihards Čapkovskis",
+          "doctype": "ToDo"
+        }
+      },
+      {
+        "json": {
+          "name": "ctvc0m72i1",
+          "owner": "Rihards.Capkovskis@biss.lv",
+          "creation": "2024-07-25 15:04:01.198729",
+          "modified": "2025-08-07 14:30:04.558163",
+          "modified_by": "Rihards.Capkovskis@biss.lv",
+          "docstatus": 0,
+          "idx": 0,
+          "status": "Open",
+          "priority": "Medium",
+          "date": "2025-08-14",
+          "allocated_to": "Rihards.Capkovskis@biss.lv",
+          "description": "<div class=\"ql-editor read-mode\"><p>My last connection try with him </p></div>",
+          "reference_type": "Leads",
+          "reference_name": "CRM-LEAD-2024-00132",
+          "assigned_by": "Rihards.Capkovskis@biss.lv",
+          "assigned_by_full_name": "Rihards Čapkovskis",
+          "assignment_rule": "Leads Assignment Rule",
+          "doctype": "ToDo"
+        }
+      },
+      {
+        "json": {
+          "name": "d5rphrhbqd",
+          "owner": "Rihards.Capkovskis@biss.lv",
+          "creation": "2025-04-07 10:56:53.909597",
+          "modified": "2025-08-08 15:47:02.911265",
+          "modified_by": "Rihards.Capkovskis@biss.lv",
+          "docstatus": 0,
+          "idx": 0,
+          "status": "Open",
+          "priority": "Low",
+          "date": "2025-08-13",
+          "allocated_to": "Rihards.Capkovskis@biss.lv",
+          "description": "<div class=\"ql-editor read-mode\"><p>follow up on conversation in watsapp</p></div>",
+          "reference_type": "Leads",
+          "reference_name": "LEADS-001696",
+          "assigned_by": "Rihards.Capkovskis@biss.lv",
+          "assigned_by_full_name": "Rihards Čapkovskis",
+          "doctype": "ToDo"
+        }
+      },
+      {
+        "json": {
+          "name": "dsmggl7ja9",
+          "owner": "Rihards.Capkovskis@biss.lv",
+          "creation": "2025-04-03 14:07:33.394142",
+          "modified": "2025-08-04 15:42:13.392259",
+          "modified_by": "Rihards.Capkovskis@biss.lv",
+          "docstatus": 0,
+          "idx": 0,
+          "status": "Open",
+          "priority": "Low",
+          "date": "2025-08-13",
+          "allocated_to": "Rihards.Capkovskis@biss.lv",
+          "description": "<div class=\"ql-editor read-mode\"><p>Follow up with him on progress of the actual project we talked or some other we could cooperate on </p></div>",
+          "reference_type": "Leads",
+          "reference_name": "LEADS-001669",
+          "assigned_by": "Rihards.Capkovskis@biss.lv",
+          "assigned_by_full_name": "Rihards Čapkovskis",
+          "doctype": "ToDo"
+        }
+      },
+      {
+        "json": {
+          "name": "eak02ahjai",
+          "owner": "Rihards.Capkovskis@biss.lv",
+          "creation": "2024-09-24 08:41:32.846742",
+          "modified": "2025-07-15 14:41:09.130598",
+          "modified_by": "Rihards.Capkovskis@biss.lv",
+          "docstatus": 0,
+          "idx": 0,
+          "status": "Open",
+          "priority": "High",
+          "date": "2025-08-11",
+          "allocated_to": "Rihards.Capkovskis@biss.lv",
+          "description": "<div class=\"ql-editor read-mode\"><p>Papildināt informācīju pēc nepieciešamības par tikšanos </p></div>",
+          "reference_type": "Leads",
+          "reference_name": "SSK Tehnologies",
+          "assigned_by": "Rihards.Capkovskis@biss.lv",
+          "assigned_by_full_name": "Rihards Čapkovskis",
+          "doctype": "ToDo"
+        }
+      },
+      {
+        "json": {
+          "name": "f5h16h9605",
+          "owner": "Rihards.Capkovskis@biss.lv",
+          "creation": "2025-06-03 16:31:48.917925",
+          "modified": "2025-08-06 10:04:58.079422",
+          "modified_by": "Rihards.Capkovskis@biss.lv",
+          "docstatus": 0,
+          "idx": 0,
+          "status": "Open",
+          "priority": "Low",
+          "date": "2025-08-12",
+          "allocated_to": "Rihards.Capkovskis@biss.lv",
+          "description": "<div class=\"ql-editor read-mode\"><p>Tower in Riyadh, parking system ----Hello Aya, could you let me know what is the planned execution date for planed next action so that we could move forward with our cooperation and as well quoting for projects that Hussama mention ?</p></div>",
+          "reference_type": "Regular Opportunity",
+          "reference_name": "REG-OPP-000552",
+          "assigned_by": "Rihards.Capkovskis@biss.lv",
+          "assigned_by_full_name": "Rihards Čapkovskis",
+          "doctype": "ToDo"
+        }
+      },
+      {
+        "json": {
+          "name": "f9e0onu07e",
+          "owner": "Rihards.Capkovskis@biss.lv",
+          "creation": "2025-06-03 16:32:01.415749",
+          "modified": "2025-08-05 15:00:27.703838",
+          "modified_by": "Rihards.Capkovskis@biss.lv",
+          "docstatus": 0,
+          "idx": 0,
+          "status": "Open",
+          "priority": "Low",
+          "date": "2025-08-12",
+          "allocated_to": "Rihards.Capkovskis@biss.lv",
+          "description": "<div class=\"ql-editor read-mode\"><p>Laysan View developments</p></div>",
+          "reference_type": "Regular Opportunity",
+          "reference_name": "REG-OPP-000553",
+          "assigned_by": "Rihards.Capkovskis@biss.lv",
+          "assigned_by_full_name": "Rihards Čapkovskis",
+          "doctype": "ToDo"
+        }
+      },
+      {
+        "json": {
+          "name": "fcquvql6ut",
+          "owner": "Rihards.Capkovskis@biss.lv",
+          "creation": "2025-06-03 16:32:12.204167",
+          "modified": "2025-08-05 15:14:41.203083",
+          "modified_by": "Rihards.Capkovskis@biss.lv",
+          "docstatus": 0,
+          "idx": 0,
+          "status": "Open",
+          "priority": "Low",
+          "date": "2025-08-15",
+          "allocated_to": "Rihards.Capkovskis@biss.lv",
+          "description": "<div class=\"ql-editor read-mode\"><p>Follow up with him regarding my last email</p></div>",
+          "reference_type": "Regular Opportunity",
+          "reference_name": "REG-OPP-000554",
+          "assigned_by": "Rihards.Capkovskis@biss.lv",
+          "assigned_by_full_name": "Rihards Čapkovskis",
+          "doctype": "ToDo"
+        }
+      },
+      {
+        "json": {
+          "name": "fj27otjh87",
+          "owner": "Rihards.Capkovskis@biss.lv",
+          "creation": "2025-06-03 16:32:32.258949",
+          "modified": "2025-08-07 14:17:25.738551",
+          "modified_by": "Rihards.Capkovskis@biss.lv",
+          "docstatus": 0,
+          "idx": 0,
+          "status": "Open",
+          "priority": "Low",
+          "date": "2025-08-14",
+          "allocated_to": "Rihards.Capkovskis@biss.lv",
+          "description": "<div class=\"ql-editor read-mode\"><p>Hilton Hotel group parking </p></div>",
+          "reference_type": "Regular Opportunity",
+          "reference_name": "REG-OPP-000555",
+          "assigned_by": "Rihards.Capkovskis@biss.lv",
+          "assigned_by_full_name": "Rihards Čapkovskis",
+          "doctype": "ToDo"
+        }
+      },
+      {
+        "json": {
+          "name": "g6hh11jcbi",
+          "owner": "Rihards.Capkovskis@biss.lv",
+          "creation": "2025-07-24 12:15:26.588908",
+          "modified": "2025-07-24 12:21:48.335676",
+          "modified_by": "Rihards.Capkovskis@biss.lv",
+          "docstatus": 0,
+          "idx": 0,
+          "status": "Open",
+          "priority": "Low",
+          "date": "2025-08-11",
+          "allocated_to": "Rihards.Capkovskis@biss.lv",
+          "description": "<div class=\"ql-editor read-mode\"><p>Follow up on the status add additional question regarding this project</p></div>",
+          "reference_type": "Regular Opportunity",
+          "reference_name": "REG-OPP-000622",
+          "assigned_by": "Rihards.Capkovskis@biss.lv",
+          "assigned_by_full_name": "Rihards Čapkovskis",
+          "doctype": "ToDo"
+        }
+      },
+      {
+        "json": {
+          "name": "gj6khoc72v",
+          "owner": "Rihards.Capkovskis@biss.lv",
+          "creation": "2025-07-14 08:19:44.619943",
+          "modified": "2025-08-04 14:09:41.761495",
+          "modified_by": "Rihards.Capkovskis@biss.lv",
+          "docstatus": 0,
+          "idx": 0,
+          "status": "Open",
+          "priority": "Low",
+          "date": "2025-08-13",
+          "allocated_to": "Rihards.Capkovskis@biss.lv",
+          "description": "<div class=\"ql-editor read-mode\"><p>Regarding new date for meeting </p></div>",
+          "reference_type": "Leads",
+          "reference_name": "LEADS-001933",
+          "assigned_by": "Rihards.Capkovskis@biss.lv",
+          "assigned_by_full_name": "Rihards Čapkovskis",
+          "doctype": "ToDo"
+        }
+      },
+      {
+        "json": {
+          "name": "gmm6kgvivj",
+          "owner": "Rihards.Capkovskis@biss.lv",
+          "creation": "2025-05-07 16:29:44.673703",
+          "modified": "2025-08-08 15:47:06.642386",
+          "modified_by": "Rihards.Capkovskis@biss.lv",
+          "docstatus": 0,
+          "idx": 0,
+          "status": "Open",
+          "priority": "Low",
+          "date": "2025-08-13",
+          "allocated_to": "Rihards.Capkovskis@biss.lv",
+          "description": "<div class=\"ql-editor read-mode\"><p>Follow up regarding the meeting dates for solution training, prupose a tehnical session</p></div>",
+          "reference_type": "Leads",
+          "reference_name": "ETECHS-Industrial Safety & Security Sector (ISSS)",
+          "assigned_by": "Rihards.Capkovskis@biss.lv",
+          "assigned_by_full_name": "Rihards Čapkovskis",
+          "doctype": "ToDo"
+        }
+      },
+      {
+        "json": {
+          "name": "gu9hrde1t1",
+          "owner": "Rihards.Capkovskis@biss.lv",
+          "creation": "2025-03-24 09:16:23.370416",
+          "modified": "2025-08-06 10:08:21.433132",
+          "modified_by": "Rihards.Capkovskis@biss.lv",
+          "docstatus": 0,
+          "idx": 0,
+          "status": "Open",
+          "priority": "Low",
+          "date": "2025-08-13",
+          "allocated_to": "Rihards.Capkovskis@biss.lv",
+          "description": "<div class=\"ql-editor read-mode\"><p>follow up on the progress contactim them </p><p><br></p></div>",
+          "reference_type": "Leads",
+          "reference_name": "LEADS-001241",
+          "assigned_by": "Rihards.Capkovskis@biss.lv",
+          "assigned_by_full_name": "Rihards Čapkovskis",
+          "doctype": "ToDo"
+        }
+      },
+      {
+        "json": {
+          "name": "hs24dcr1q7",
+          "owner": "Rihards.Capkovskis@biss.lv",
+          "creation": "2025-03-21 13:56:35.464038",
+          "modified": "2025-07-24 12:36:20.733824",
+          "modified_by": "Rihards.Capkovskis@biss.lv",
+          "docstatus": 0,
+          "idx": 0,
+          "status": "Open",
+          "priority": "Low",
+          "date": "2025-08-12",
+          "allocated_to": "Rihards.Capkovskis@biss.lv",
+          "description": "Burabay National Park - Skymax",
+          "reference_type": "Regular Opportunity",
+          "reference_name": "REG-OPP-000306",
+          "assigned_by": "Rihards.Capkovskis@biss.lv",
+          "assigned_by_full_name": "Rihards Čapkovskis",
+          "doctype": "ToDo"
+        }
+      },
+      {
+        "json": {
+          "name": "i6ef921kp3",
+          "owner": "Rihards.Capkovskis@biss.lv",
+          "creation": "2024-08-27 14:17:27.930934",
+          "modified": "2025-08-06 10:32:01.295873",
+          "modified_by": "Rihards.Capkovskis@biss.lv",
+          "docstatus": 0,
+          "idx": 0,
+          "status": "Open",
+          "priority": "Medium",
+          "date": "2025-08-15",
+          "allocated_to": "Rihards.Capkovskis@biss.lv",
+          "description": "Assignment for Leads GoRamp",
+          "reference_type": "Leads",
+          "reference_name": "GoRamp",
+          "assigned_by": "Rihards.Capkovskis@biss.lv",
+          "assigned_by_full_name": "Rihards Čapkovskis",
+          "doctype": "ToDo"
+        }
+      },
+      {
+        "json": {
+          "name": "ia2jdk2545",
+          "owner": "Rihards.Capkovskis@biss.lv",
+          "creation": "2025-07-07 13:26:53.053787",
+          "modified": "2025-07-07 13:26:53.053787",
+          "modified_by": "Rihards.Capkovskis@biss.lv",
+          "docstatus": 0,
+          "idx": 0,
+          "status": "Open",
+          "priority": "Low",
+          "date": "2025-08-11",
+          "allocated_to": "Rihards.Capkovskis@biss.lv",
+          "description": "<div class=\"ql-editor read-mode\"><p>Follow up if there is no communication regarding the existing projects</p></div>",
+          "reference_type": "Leads",
+          "reference_name": "LEADS-000746",
+          "assigned_by": "Rihards.Capkovskis@biss.lv",
+          "assigned_by_full_name": "Rihards Čapkovskis",
+          "doctype": "ToDo"
+        }
+      },
+      {
+        "json": {
+          "name": "idton0ph4j",
+          "owner": "Rihards.Capkovskis@biss.lv",
+          "creation": "2025-07-15 15:19:43.757657",
+          "modified": "2025-08-06 09:59:13.366996",
+          "modified_by": "Rihards.Capkovskis@biss.lv",
+          "docstatus": 0,
+          "idx": 0,
+          "status": "Open",
+          "priority": "Low",
+          "date": "2025-08-13",
+          "allocated_to": "Rihards.Capkovskis@biss.lv",
+          "description": "<div class=\"ql-editor read-mode\"><p>Follow up on message</p></div>",
+          "reference_type": "Leads",
+          "reference_name": "LEADS-001354",
+          "assigned_by": "Rihards.Capkovskis@biss.lv",
+          "assigned_by_full_name": "Rihards Čapkovskis",
+          "doctype": "ToDo"
+        }
+      },
+      {
+        "json": {
+          "name": "j6unnf8uv5",
+          "owner": "Rihards.Capkovskis@biss.lv",
+          "creation": "2025-06-17 11:03:21.459321",
+          "modified": "2025-08-07 14:08:03.265741",
+          "modified_by": "Rihards.Capkovskis@biss.lv",
+          "docstatus": 0,
+          "idx": 0,
+          "status": "Open",
+          "priority": "Low",
+          "date": "2025-08-14",
+          "allocated_to": "Rihards.Capkovskis@biss.lv",
+          "description": "<div class=\"ql-editor read-mode\"><p>Follow up on my message </p></div>",
+          "reference_type": "Leads",
+          "reference_name": " Advanced Vision",
+          "assigned_by": "Rihards.Capkovskis@biss.lv",
+          "assigned_by_full_name": "Rihards Čapkovskis",
+          "doctype": "ToDo"
+        }
+      },
+      {
+        "json": {
+          "name": "jvrd0lkabj",
+          "owner": "Rihards.Capkovskis@biss.lv",
+          "creation": "2025-07-15 15:22:23.519066",
+          "modified": "2025-08-06 09:51:53.811837",
+          "modified_by": "Rihards.Capkovskis@biss.lv",
+          "docstatus": 0,
+          "idx": 0,
+          "status": "Open",
+          "priority": "Low",
+          "date": "2025-08-13",
+          "allocated_to": "Rihards.Capkovskis@biss.lv",
+          "description": "<div class=\"ql-editor read-mode\"><p>Follow up in whatsapp </p></div>",
+          "reference_type": "Leads",
+          "reference_name": "LEADS-001921",
+          "assigned_by": "Rihards.Capkovskis@biss.lv",
+          "assigned_by_full_name": "Rihards Čapkovskis",
+          "doctype": "ToDo"
+        }
+      },
+      {
+        "json": {
+          "name": "k6mjmn81sl",
+          "owner": "Rihards.Capkovskis@biss.lv",
+          "creation": "2025-07-15 15:22:45.424970",
+          "modified": "2025-08-06 09:48:29.951373",
+          "modified_by": "Rihards.Capkovskis@biss.lv",
+          "docstatus": 0,
+          "idx": 0,
+          "status": "Open",
+          "priority": "Low",
+          "date": "2025-08-13",
+          "allocated_to": "Rihards.Capkovskis@biss.lv",
+          "description": "<div class=\"ql-editor read-mode\"><p>Follow up on status of message</p></div>",
+          "reference_type": "Leads",
+          "reference_name": "LEADS-001345",
+          "assigned_by": "Rihards.Capkovskis@biss.lv",
+          "assigned_by_full_name": "Rihards Čapkovskis",
+          "doctype": "ToDo"
+        }
+      },
+      {
+        "json": {
+          "name": "k9la3m4q3g",
+          "owner": "Rihards.Capkovskis@biss.lv",
+          "creation": "2025-07-15 15:22:54.982631",
+          "modified": "2025-08-06 09:43:15.824785",
+          "modified_by": "Rihards.Capkovskis@biss.lv",
+          "docstatus": 0,
+          "idx": 0,
+          "status": "Open",
+          "priority": "Low",
+          "date": "2025-08-13",
+          "allocated_to": "Rihards.Capkovskis@biss.lv",
+          "description": "<div class=\"ql-editor read-mode\"><p>Quantum Egypt</p></div>",
+          "reference_type": "Leads",
+          "reference_name": "LEADS-001355",
+          "assigned_by": "Rihards.Capkovskis@biss.lv",
+          "assigned_by_full_name": "Rihards Čapkovskis",
+          "doctype": "ToDo"
+        }
+      },
+      {
+        "json": {
+          "name": "ko8cfomg7r",
+          "owner": "Rihards.Capkovskis@biss.lv",
+          "creation": "2025-07-15 15:23:41.600717",
+          "modified": "2025-08-07 14:06:27.707553",
+          "modified_by": "Rihards.Capkovskis@biss.lv",
+          "docstatus": 0,
+          "idx": 0,
+          "status": "Open",
+          "priority": "Low",
+          "date": "2025-08-12",
+          "allocated_to": "Rihards.Capkovskis@biss.lv",
+          "description": "<div class=\"ql-editor read-mode\"><p>Integrated-PS</p></div>",
+          "reference_type": "Leads",
+          "reference_name": "LEADS-001464",
+          "assigned_by": "Rihards.Capkovskis@biss.lv",
+          "assigned_by_full_name": "Rihards Čapkovskis",
+          "doctype": "ToDo"
+        }
+      },
+      {
+        "json": {
+          "name": "kpgf1tvn61",
+          "owner": "Rihards.Capkovskis@biss.lv",
+          "creation": "2025-02-10 11:06:31.157895",
+          "modified": "2025-08-07 14:04:09.459168",
+          "modified_by": "Rihards.Capkovskis@biss.lv",
+          "docstatus": 0,
+          "idx": 0,
+          "status": "Open",
+          "priority": "Medium",
+          "date": "2025-08-11",
+          "allocated_to": "Rihards.Capkovskis@biss.lv",
+          "description": "<div class=\"ql-editor read-mode\"><p>Follow up with them regarding the needs for finding new clients </p></div>",
+          "reference_type": "Leads",
+          "reference_name": "LEADS-001012",
+          "assigned_by": "Rihards.Capkovskis@biss.lv",
+          "assigned_by_full_name": "Rihards Čapkovskis",
+          "doctype": "ToDo"
+        }
+      },
+      {
+        "json": {
+          "name": "ktrihc3t8d",
+          "owner": "Rihards.Capkovskis@biss.lv",
+          "creation": "2025-07-15 15:23:59.534241",
+          "modified": "2025-08-07 14:46:09.785526",
+          "modified_by": "Rihards.Capkovskis@biss.lv",
+          "docstatus": 0,
+          "idx": 0,
+          "status": "Open",
+          "priority": "Low",
+          "date": "2025-08-14",
+          "allocated_to": "Rihards.Capkovskis@biss.lv",
+          "description": "<div class=\"ql-editor read-mode\"><p>ELSEWEDY PSP</p></div>",
+          "reference_type": "Leads",
+          "reference_name": "LEADS-001630",
+          "assigned_by": "Rihards.Capkovskis@biss.lv",
+          "assigned_by_full_name": "Rihards Čapkovskis",
+          "doctype": "ToDo"
+        }
+      },
+      {
+        "json": {
+          "name": "l0bgi2234f",
+          "owner": "Rihards.Capkovskis@biss.lv",
+          "creation": "2025-07-15 15:24:07.527982",
+          "modified": "2025-08-07 13:45:53.089427",
+          "modified_by": "Rihards.Capkovskis@biss.lv",
+          "docstatus": 0,
+          "idx": 0,
+          "status": "Open",
+          "priority": "Low",
+          "date": "2025-08-12",
+          "allocated_to": "Rihards.Capkovskis@biss.lv",
+          "description": "<div class=\"ql-editor read-mode\"><p>Almarasem Egy</p></div>",
+          "reference_type": "Leads",
+          "reference_name": "LEADS-001743",
+          "assigned_by": "Rihards.Capkovskis@biss.lv",
+          "assigned_by_full_name": "Rihards Čapkovskis",
+          "doctype": "ToDo"
+        }
+      },
+      {
+        "json": {
+          "name": "l37q94b221",
+          "owner": "Rihards.Capkovskis@biss.lv",
+          "creation": "2025-07-15 15:24:16.768298",
+          "modified": "2025-08-04 15:07:44.548877",
+          "modified_by": "Rihards.Capkovskis@biss.lv",
+          "docstatus": 0,
+          "idx": 0,
+          "status": "Open",
+          "priority": "Low",
+          "date": "2025-08-13",
+          "allocated_to": "Rihards.Capkovskis@biss.lv",
+          "description": "<div class=\"ql-editor read-mode\"><p>CCG - Egy</p></div>",
+          "reference_type": "Leads",
+          "reference_name": "LEADS-001746",
+          "assigned_by": "Rihards.Capkovskis@biss.lv",
+          "assigned_by_full_name": "Rihards Čapkovskis",
+          "doctype": "ToDo"
+        }
+      },
+      {
+        "json": {
+          "name": "l5o4201r2g",
+          "owner": "Rihards.Capkovskis@biss.lv",
+          "creation": "2025-07-15 15:24:24.860391",
+          "modified": "2025-08-07 14:48:58.716065",
+          "modified_by": "Rihards.Capkovskis@biss.lv",
+          "docstatus": 0,
+          "idx": 0,
+          "status": "Open",
+          "priority": "Low",
+          "date": "2025-08-14",
+          "allocated_to": "Rihards.Capkovskis@biss.lv",
+          "description": "<div class=\"ql-editor read-mode\"><p>Marhab Egy</p></div>",
+          "reference_type": "Leads",
+          "reference_name": "LEADS-001774",
+          "assigned_by": "Rihards.Capkovskis@biss.lv",
+          "assigned_by_full_name": "Rihards Čapkovskis",
+          "doctype": "ToDo"
+        }
+      },
+      {
+        "json": {
+          "name": "l9n0gu0m2f",
+          "owner": "Rihards.Capkovskis@biss.lv",
+          "creation": "2025-07-15 15:24:37.553975",
+          "modified": "2025-08-08 15:47:18.082414",
+          "modified_by": "Rihards.Capkovskis@biss.lv",
+          "docstatus": 0,
+          "idx": 0,
+          "status": "Open",
+          "priority": "Low",
+          "date": "2025-08-14",
+          "allocated_to": "Rihards.Capkovskis@biss.lv",
+          "description": "<div class=\"ql-editor read-mode\"><p>Experts House - Egy</p></div>",
+          "reference_type": "Leads",
+          "reference_name": "LEADS-001827",
+          "assigned_by": "Rihards.Capkovskis@biss.lv",
+          "assigned_by_full_name": "Rihards Čapkovskis",
+          "doctype": "ToDo"
+        }
+      },
+      {
+        "json": {
+          "name": "lb32pghagq",
+          "owner": "Rihards.Capkovskis@biss.lv",
+          "creation": "2025-04-03 13:25:39.547613",
+          "modified": "2025-08-08 15:47:21.091995",
+          "modified_by": "Rihards.Capkovskis@biss.lv",
+          "docstatus": 0,
+          "idx": 0,
+          "status": "Open",
+          "priority": "Low",
+          "date": "2025-08-14",
+          "allocated_to": "Rihards.Capkovskis@biss.lv",
+          "description": "<div class=\"ql-editor read-mode\"><p>RAUWERS</p></div>",
+          "reference_type": "Leads",
+          "reference_name": "LEADS-001666",
+          "assigned_by": "Rihards.Capkovskis@biss.lv",
+          "assigned_by_full_name": "Rihards Čapkovskis",
+          "doctype": "ToDo"
+        }
+      },
+      {
+        "json": {
+          "name": "lcmqorl1dl",
+          "owner": "Rihards.Capkovskis@biss.lv",
+          "creation": "2025-07-15 15:24:47.068804",
+          "modified": "2025-08-08 15:47:24.302952",
+          "modified_by": "Rihards.Capkovskis@biss.lv",
+          "docstatus": 0,
+          "idx": 0,
+          "status": "Open",
+          "priority": "Low",
+          "date": "2025-08-14",
+          "allocated_to": "Rihards.Capkovskis@biss.lv",
+          "description": "<div class=\"ql-editor read-mode\"><p>LMD</p></div>",
+          "reference_type": "Leads",
+          "reference_name": "LEADS-001856",
+          "assigned_by": "Rihards.Capkovskis@biss.lv",
+          "assigned_by_full_name": "Rihards Čapkovskis",
+          "doctype": "ToDo"
+        }
+      },
+      {
+        "json": {
+          "name": "leekt5fqi6",
+          "owner": "Rihards.Capkovskis@biss.lv",
+          "creation": "2025-02-10 10:42:39.932780",
+          "modified": "2025-08-06 08:49:20.808886",
+          "modified_by": "Rihards.Capkovskis@biss.lv",
+          "docstatus": 0,
+          "idx": 0,
+          "status": "Open",
+          "priority": "Medium",
+          "date": "2025-08-13",
+          "allocated_to": "Rihards.Capkovskis@biss.lv",
+          "description": "<div class=\"ql-editor read-mode\"><p>Follow up if Mihai responded to my email</p><p><br></p></div>",
+          "reference_type": "Leads",
+          "reference_name": "LEADS-001013",
+          "assigned_by": "Rihards.Capkovskis@biss.lv",
+          "assigned_by_full_name": "Rihards Čapkovskis",
+          "doctype": "ToDo"
+        }
+      },
+      {
+        "json": {
+          "name": "li3qrgjd6q",
+          "owner": "Rihards.Capkovskis@biss.lv",
+          "creation": "2025-05-07 10:15:44.335170",
+          "modified": "2025-08-04 15:36:23.303424",
+          "modified_by": "Rihards.Capkovskis@biss.lv",
+          "docstatus": 0,
+          "idx": 0,
+          "status": "Open",
+          "priority": "Low",
+          "date": "2025-08-11",
+          "allocated_to": "Rihards.Capkovskis@biss.lv",
+          "description": "<div class=\"ql-editor read-mode\"><p>Indutrial park Brasov- Truck parking </p></div>",
+          "reference_type": "Regular Opportunity",
+          "reference_name": "REG-OPP-000490",
+          "assigned_by": "Rihards.Capkovskis@biss.lv",
+          "assigned_by_full_name": "Rihards Čapkovskis",
+          "doctype": "ToDo"
+        }
+      },
+      {
+        "json": {
+          "name": "lll2dg7r7b",
+          "owner": "Rihards.Capkovskis@biss.lv",
+          "creation": "2025-03-21 14:03:04.565597",
+          "modified": "2025-08-06 09:29:01.045936",
+          "modified_by": "Rihards.Capkovskis@biss.lv",
+          "docstatus": 0,
+          "idx": 0,
+          "status": "Open",
+          "priority": "Low",
+          "date": "2025-08-12",
+          "allocated_to": "Rihards.Capkovskis@biss.lv",
+          "description": "<div class=\"ql-editor read-mode\"><p>Follow up with Noel regarding the project progress </p></div>",
+          "reference_type": "Regular Opportunity",
+          "reference_name": "REG-OPP-000300",
+          "assigned_by": "Rihards.Capkovskis@biss.lv",
+          "assigned_by_full_name": "Rihards Čapkovskis",
+          "doctype": "ToDo"
+        }
+      },
+      {
+        "json": {
+          "name": "mb2hmf7n0v",
+          "owner": "Rihards.Capkovskis@biss.lv",
+          "creation": "2025-08-04 15:07:37.847456",
+          "modified": "2025-08-04 15:07:37.847456",
+          "modified_by": "Rihards.Capkovskis@biss.lv",
+          "docstatus": 0,
+          "idx": 0,
+          "status": "Open",
+          "priority": "Low",
+          "date": "2025-08-13",
+          "allocated_to": "Rihards.Capkovskis@biss.lv",
+          "description": "<div class=\"ql-editor read-mode\"><p>ACUD - Egy </p></div>",
+          "reference_type": "Leads",
+          "reference_name": "LEADS-001828",
+          "assigned_by": "Rihards.Capkovskis@biss.lv",
+          "assigned_by_full_name": "Rihards Čapkovskis",
+          "doctype": "ToDo"
+        }
+      },
+      {
+        "json": {
+          "name": "mi7f0f2bcq",
+          "owner": "Rihards.Capkovskis@biss.lv",
+          "creation": "2025-08-04 15:08:00.705360",
+          "modified": "2025-08-04 15:08:00.705360",
+          "modified_by": "Rihards.Capkovskis@biss.lv",
+          "docstatus": 0,
+          "idx": 0,
+          "status": "Open",
+          "priority": "Low",
+          "date": "2025-08-13",
+          "allocated_to": "Rihards.Capkovskis@biss.lv",
+          "description": "<div class=\"ql-editor read-mode\"><p>Follow up</p></div>",
+          "reference_type": "Leads",
+          "reference_name": "LEADS-001429",
+          "assigned_by": "Rihards.Capkovskis@biss.lv",
+          "assigned_by_full_name": "Rihards Čapkovskis",
+          "doctype": "ToDo"
+        }
+      },
+      {
+        "json": {
+          "name": "mjtocimeeo",
+          "owner": "Rihards.Capkovskis@biss.lv",
+          "creation": "2025-02-18 11:41:26.037818",
+          "modified": "2025-08-04 15:38:23.058383",
+          "modified_by": "Rihards.Capkovskis@biss.lv",
+          "docstatus": 0,
+          "idx": 0,
+          "status": "Open",
+          "priority": "High",
+          "date": "2025-08-14",
+          "allocated_to": "Rihards.Capkovskis@biss.lv",
+          "description": "<div class=\"ql-editor read-mode\"><p>Follow up on my last email regarding Cenks answear </p><p><br></p></div>",
+          "reference_type": "Leads",
+          "reference_name": "LEADS-001369",
+          "assigned_by": "Rihards.Capkovskis@biss.lv",
+          "assigned_by_full_name": "Rihards Čapkovskis",
+          "doctype": "ToDo"
+        }
+      },
+      {
+        "json": {
+          "name": "mo4mdvdtgq",
+          "owner": "Rihards.Capkovskis@biss.lv",
+          "creation": "2025-07-10 13:28:54.828694",
+          "modified": "2025-08-04 13:08:21.424191",
+          "modified_by": "Rihards.Capkovskis@biss.lv",
+          "docstatus": 0,
+          "idx": 0,
+          "status": "Open",
+          "priority": "Low",
+          "date": "2025-08-13",
+          "allocated_to": "Rihards.Capkovskis@biss.lv",
+          "description": "<div class=\"ql-editor read-mode\"><p>Follow up on meeting date </p></div>",
+          "reference_type": "Leads",
+          "reference_name": "LEADS-001019",
+          "assigned_by": "Rihards.Capkovskis@biss.lv",
+          "assigned_by_full_name": "Rihards Čapkovskis",
+          "doctype": "ToDo"
+        }
+      },
+      {
+        "json": {
+          "name": "mv6olndtaf",
+          "owner": "Rihards.Capkovskis@biss.lv",
+          "creation": "2025-04-07 11:13:36.623899",
+          "modified": "2025-08-08 14:11:21.458611",
+          "modified_by": "Rihards.Capkovskis@biss.lv",
+          "docstatus": 0,
+          "idx": 0,
+          "status": "Open",
+          "priority": "Low",
+          "date": "2025-08-15",
+          "allocated_to": "Rihards.Capkovskis@biss.lv",
+          "description": "<div class=\"ql-editor read-mode\"><p>Anab Group</p></div>",
+          "reference_type": "Leads",
+          "reference_name": "LEADS-001655",
+          "assigned_by": "Rihards.Capkovskis@biss.lv",
+          "assigned_by_full_name": "Rihards Čapkovskis",
+          "doctype": "ToDo"
+        }
+      },
+      {
+        "json": {
+          "name": "n6fmo1pkf6",
+          "owner": "Rihards.Capkovskis@biss.lv",
+          "creation": "2025-04-03 13:28:49.582794",
+          "modified": "2025-08-08 14:10:57.715638",
+          "modified_by": "Rihards.Capkovskis@biss.lv",
+          "docstatus": 0,
+          "idx": 0,
+          "status": "Open",
+          "priority": "Low",
+          "date": "2025-08-15",
+          "allocated_to": "Rihards.Capkovskis@biss.lv",
+          "description": "<div class=\"ql-editor read-mode\"><p>Optimal Parking Control</p></div>",
+          "reference_type": "Leads",
+          "reference_name": "LEADS-001665",
+          "assigned_by": "Rihards.Capkovskis@biss.lv",
+          "assigned_by_full_name": "Rihards Čapkovskis",
+          "doctype": "ToDo"
+        }
+      },
+      {
+        "json": {
+          "name": "njs2o5kao9",
+          "owner": "Rihards.Capkovskis@biss.lv",
+          "creation": "2025-06-11 08:38:07.583530",
+          "modified": "2025-08-06 09:36:27.546529",
+          "modified_by": "Rihards.Capkovskis@biss.lv",
+          "docstatus": 0,
+          "idx": 0,
+          "status": "Open",
+          "priority": "Low",
+          "date": "2025-08-12",
+          "allocated_to": "Rihards.Capkovskis@biss.lv",
+          "description": "<div class=\"ql-editor read-mode\"><p>follow up on my email and continue the progress on cooperation </p></div>",
+          "reference_type": "Leads",
+          "reference_name": "LEADS-001894",
+          "assigned_by": "Rihards.Capkovskis@biss.lv",
+          "assigned_by_full_name": "Rihards Čapkovskis",
+          "doctype": "ToDo"
+        }
+      },
+      {
+        "json": {
+          "name": "ntn9af929o",
+          "owner": "Rihards.Capkovskis@biss.lv",
+          "creation": "2025-04-07 12:09:51.106750",
+          "modified": "2025-07-14 15:14:52.922897",
+          "modified_by": "Rihards.Capkovskis@biss.lv",
+          "docstatus": 0,
+          "idx": 0,
+          "status": "Open",
+          "priority": "Low",
+          "date": "2025-08-12",
+          "allocated_to": "Rihards.Capkovskis@biss.lv",
+          "description": "<div class=\"ql-editor read-mode\"><p>SAS SYSTEMS ENGINEERING</p></div>",
+          "reference_type": "Leads",
+          "reference_name": "LEADS-001336",
+          "assigned_by": "Rihards.Capkovskis@biss.lv",
+          "assigned_by_full_name": "Rihards Čapkovskis",
+          "doctype": "ToDo"
+        }
+      },
+      {
+        "json": {
+          "name": "o8rq7ldb3i",
+          "owner": "Rihards.Capkovskis@biss.lv",
+          "creation": "2025-06-04 10:05:00.305523",
+          "modified": "2025-08-08 15:47:09.944880",
+          "modified_by": "Rihards.Capkovskis@biss.lv",
+          "docstatus": 0,
+          "idx": 0,
+          "status": "Open",
+          "priority": "Low",
+          "date": "2025-08-13",
+          "allocated_to": "Rihards.Capkovskis@biss.lv",
+          "description": "<div class=\"ql-editor read-mode\"><p>Follow up on my &nbsp;last emails </p></div>",
+          "reference_type": "Leads",
+          "reference_name": "LEADS-001737",
+          "assigned_by": "Rihards.Capkovskis@biss.lv",
+          "assigned_by_full_name": "Rihards Čapkovskis",
+          "doctype": "ToDo"
+        }
+      },
+      {
+        "json": {
+          "name": "og0at26hc8",
+          "owner": "Rihards.Capkovskis@biss.lv",
+          "creation": "2025-08-05 13:02:01.604715",
+          "modified": "2025-08-08 14:10:45.114945",
+          "modified_by": "Rihards.Capkovskis@biss.lv",
+          "docstatus": 0,
+          "idx": 0,
+          "status": "Open",
+          "priority": "Low",
+          "date": "2025-08-11",
+          "allocated_to": "Rihards.Capkovskis@biss.lv",
+          "description": "<div class=\"ql-editor read-mode\"><p>Follow up with him </p></div>",
+          "reference_type": "Leads",
+          "reference_name": "LEADS-001945",
+          "assigned_by": "Rihards.Capkovskis@biss.lv",
+          "assigned_by_full_name": "Rihards Čapkovskis",
+          "doctype": "ToDo"
+        }
+      },
+      {
+        "json": {
+          "name": "om7vubvhel",
+          "owner": "Rihards.Capkovskis@biss.lv",
+          "creation": "2025-06-11 14:07:38.331626",
+          "modified": "2025-08-06 08:55:03.399219",
+          "modified_by": "Rihards.Capkovskis@biss.lv",
+          "docstatus": 0,
+          "idx": 0,
+          "status": "Open",
+          "priority": "Low",
+          "date": "2025-08-13",
+          "allocated_to": "Rihards.Capkovskis@biss.lv",
+          "description": "<div class=\"ql-editor read-mode\"><p>KNOWLEDGE &amp; SMART SOLUTIONS</p></div>",
+          "reference_type": "Leads",
+          "reference_name": "LEADS-001368",
+          "assigned_by": "Rihards.Capkovskis@biss.lv",
+          "assigned_by_full_name": "Rihards Čapkovskis",
+          "doctype": "ToDo"
+        }
+      },
+      {
+        "json": {
+          "name": "paovsqjnnb",
+          "owner": "Rihards.Capkovskis@biss.lv",
+          "creation": "2025-02-03 14:07:28.366671",
+          "modified": "2025-08-06 09:27:12.941400",
+          "modified_by": "Rihards.Capkovskis@biss.lv",
+          "docstatus": 0,
+          "idx": 0,
+          "status": "Open",
+          "priority": "Low",
+          "date": "2025-08-12",
+          "allocated_to": "Rihards.Capkovskis@biss.lv",
+          "description": "Parking projects simple",
+          "reference_type": "Regular Opportunity",
+          "reference_name": "REG-OPP-000267",
+          "assigned_by": "Rihards.Capkovskis@biss.lv",
+          "assigned_by_full_name": "Rihards Čapkovskis",
+          "doctype": "ToDo"
+        }
+      },
+      {
+        "json": {
+          "name": "pcba43bk0k",
+          "owner": "Rihards.Capkovskis@biss.lv",
+          "creation": "2025-06-20 15:41:24.380073",
+          "modified": "2025-08-08 14:10:25.481657",
+          "modified_by": "Rihards.Capkovskis@biss.lv",
+          "docstatus": 0,
+          "idx": 0,
+          "status": "Open",
+          "priority": "Medium",
+          "date": "2025-08-15",
+          "allocated_to": "Rihards.Capkovskis@biss.lv",
+          "description": "<div class=\"ql-editor read-mode\"><p>Follow up to the message </p></div>",
+          "reference_type": "Leads",
+          "reference_name": "LEADS-000787",
+          "assigned_by": "Rihards.Capkovskis@biss.lv",
+          "assigned_by_full_name": "Rihards Čapkovskis",
+          "doctype": "ToDo"
+        }
+      },
+      {
+        "json": {
+          "name": "qbh8ktq7qs",
+          "owner": "Rihards.Capkovskis@biss.lv",
+          "creation": "2025-03-18 14:16:36.892184",
+          "modified": "2025-08-05 15:20:20.529447",
+          "modified_by": "Rihards.Capkovskis@biss.lv",
+          "docstatus": 0,
+          "idx": 0,
+          "status": "Open",
+          "priority": "Low",
+          "date": "2025-08-13",
+          "allocated_to": "Rihards.Capkovskis@biss.lv",
+          "description": "SI security systems",
+          "reference_type": "Leads",
+          "reference_name": "LEADS-001467",
+          "assigned_by": "Rihards.Capkovskis@biss.lv",
+          "assigned_by_full_name": "Rihards Čapkovskis",
+          "doctype": "ToDo"
+        }
+      },
+      {
+        "json": {
+          "name": "qjtc2j955f",
+          "owner": "Rihards.Capkovskis@biss.lv",
+          "creation": "2025-04-07 11:19:50.173401",
+          "modified": "2025-08-08 14:10:16.141224",
+          "modified_by": "Rihards.Capkovskis@biss.lv",
+          "docstatus": 0,
+          "idx": 0,
+          "status": "Open",
+          "priority": "Low",
+          "date": "2025-08-15",
+          "allocated_to": "Rihards.Capkovskis@biss.lv",
+          "description": "<div class=\"ql-editor read-mode\"><p>Al Musbah Group</p></div>",
+          "reference_type": "Leads",
+          "reference_name": "LEADS-001652",
+          "assigned_by": "Rihards.Capkovskis@biss.lv",
+          "assigned_by_full_name": "Rihards Čapkovskis",
+          "doctype": "ToDo"
+        }
+      },
+      {
+        "json": {
+          "name": "qlug9cn89c",
+          "owner": "Rihards.Capkovskis@biss.lv",
+          "creation": "2025-04-15 12:17:58.276271",
+          "modified": "2025-06-11 15:34:58.870347",
+          "modified_by": "Rihards.Capkovskis@biss.lv",
+          "docstatus": 0,
+          "idx": 0,
+          "status": "Open",
+          "priority": "Low",
+          "date": "2025-08-11",
+          "allocated_to": "Rihards.Capkovskis@biss.lv",
+          "description": "<div class=\"ql-editor read-mode\"><p>Britannia Parking</p></div>",
+          "reference_type": "Leads",
+          "reference_name": "LEADS-001736",
+          "assigned_by": "Rihards.Capkovskis@biss.lv",
+          "assigned_by_full_name": "Rihards Čapkovskis",
+          "doctype": "ToDo"
+        }
+      },
+      {
+        "json": {
+          "name": "qut0itiva6",
+          "owner": "Rihards.Capkovskis@biss.lv",
+          "creation": "2025-04-16 11:58:23.714308",
+          "modified": "2025-07-10 10:24:05.156193",
+          "modified_by": "Rihards.Capkovskis@biss.lv",
+          "docstatus": 0,
+          "idx": 0,
+          "status": "Open",
+          "priority": "Low",
+          "date": "2025-08-12",
+          "allocated_to": "Rihards.Capkovskis@biss.lv",
+          "description": "<div class=\"ql-editor read-mode\"><p>Follow up with them on other projects and opportunities </p></div>",
+          "reference_type": "Leads",
+          "reference_name": "LEADS-001167",
+          "assigned_by": "Rihards.Capkovskis@biss.lv",
+          "assigned_by_full_name": "Rihards Čapkovskis",
+          "doctype": "ToDo"
+        }
+      },
+      {
+        "json": {
+          "name": "rkp1gfbvc2",
+          "owner": "Rihards.Capkovskis@biss.lv",
+          "creation": "2025-05-30 08:12:34.498686",
+          "modified": "2025-08-04 15:42:04.887045",
+          "modified_by": "Rihards.Capkovskis@biss.lv",
+          "docstatus": 0,
+          "idx": 0,
+          "status": "Open",
+          "priority": "Low",
+          "date": "2025-08-13",
+          "allocated_to": "Rihards.Capkovskis@biss.lv",
+          "description": "<div class=\"ql-editor read-mode\"><p>Follow up on the stage we are in or some kind of time line</p></div>",
+          "reference_type": "Regular Opportunity",
+          "reference_name": "REG-OPP-000542",
+          "assigned_by": "Rihards.Capkovskis@biss.lv",
+          "assigned_by_full_name": "Rihards Čapkovskis",
+          "doctype": "ToDo"
+        }
+      },
+      {
+        "json": {
+          "name": "s5q6n3fur9",
+          "owner": "Rihards.Capkovskis@biss.lv",
+          "creation": "2025-05-06 14:25:32.256298",
+          "modified": "2025-08-06 08:59:17.223888",
+          "modified_by": "Rihards.Capkovskis@biss.lv",
+          "docstatus": 0,
+          "idx": 0,
+          "status": "Open",
+          "priority": "Low",
+          "date": "2025-08-13",
+          "allocated_to": "Rihards.Capkovskis@biss.lv",
+          "description": "<div class=\"ql-editor read-mode\"><p>Follow up on my message and emails </p></div>",
+          "reference_type": "Regular Opportunity",
+          "reference_name": "REG-OPP-000489",
+          "assigned_by": "Rihards.Capkovskis@biss.lv",
+          "assigned_by_full_name": "Rihards Čapkovskis",
+          "doctype": "ToDo"
+        }
+      },
+      {
+        "json": {
+          "name": "slqsouhhsv",
+          "owner": "Rihards.Capkovskis@biss.lv",
+          "creation": "2025-05-13 10:16:47.466563",
+          "modified": "2025-07-08 12:59:47.531369",
+          "modified_by": "Rihards.Capkovskis@biss.lv",
+          "docstatus": 0,
+          "idx": 0,
+          "status": "Open",
+          "priority": "Low",
+          "date": "2025-08-13",
+          "allocated_to": "Rihards.Capkovskis@biss.lv",
+          "description": "<div class=\"ql-editor read-mode\"><p>Follow up on registration under Roshn </p></div>",
+          "reference_type": "Leads",
+          "reference_name": "LEADS-000586",
+          "assigned_by": "Rihards.Capkovskis@biss.lv",
+          "assigned_by_full_name": "Rihards Čapkovskis",
+          "doctype": "ToDo"
+        }
+      },
+      {
+        "json": {
+          "name": "ta5k0laaqk",
+          "owner": "Rihards.Capkovskis@biss.lv",
+          "creation": "2025-04-07 11:24:26.184471",
+          "modified": "2025-08-07 10:18:21.070251",
+          "modified_by": "Rihards.Capkovskis@biss.lv",
+          "docstatus": 0,
+          "idx": 0,
+          "status": "Open",
+          "priority": "Low",
+          "date": "2025-08-13",
+          "allocated_to": "Rihards.Capkovskis@biss.lv",
+          "description": "<div class=\"ql-editor read-mode\"><p>Decide on the cooperation model</p></div>",
+          "reference_type": "Leads",
+          "reference_name": "LEADS-001650",
+          "assigned_by": "Rihards.Capkovskis@biss.lv",
+          "assigned_by_full_name": "Rihards Čapkovskis",
+          "doctype": "ToDo"
+        }
+      },
+      {
+        "json": {
+          "name": "tfblihsdjb",
+          "owner": "Rihards.Capkovskis@biss.lv",
+          "creation": "2025-03-12 13:19:35.560741",
+          "modified": "2025-07-14 15:27:14.862208",
+          "modified_by": "Rihards.Capkovskis@biss.lv",
+          "docstatus": 0,
+          "idx": 0,
+          "status": "Open",
+          "priority": "Low",
+          "date": "2025-08-11",
+          "allocated_to": "Rihards.Capkovskis@biss.lv",
+          "description": "Alarmtec",
+          "reference_type": "Leads",
+          "reference_name": "LEADS-001451",
+          "assigned_by": "Rihards.Capkovskis@biss.lv",
+          "assigned_by_full_name": "Rihards Čapkovskis",
+          "doctype": "ToDo"
+        }
+      },
+      {
+        "json": {
+          "name": "th5248opvc",
+          "owner": "Rihards.Capkovskis@biss.lv",
+          "creation": "2025-08-07 11:35:54.100531",
+          "modified": "2025-08-07 11:35:54.100531",
+          "modified_by": "Rihards.Capkovskis@biss.lv",
+          "docstatus": 0,
+          "idx": 0,
+          "status": "Open",
+          "priority": "Low",
+          "date": "2025-08-14",
+          "allocated_to": "Rihards.Capkovskis@biss.lv",
+          "description": "<div class=\"ql-editor read-mode\"><p>Follow up on the project </p></div>",
+          "reference_type": "Regular Opportunity",
+          "reference_name": "REG-OPP-000639",
+          "assigned_by": "Rihards.Capkovskis@biss.lv",
+          "assigned_by_full_name": "Rihards Čapkovskis",
+          "doctype": "ToDo"
+        }
+      },
+      {
+        "json": {
+          "name": "ttq2h2os0p",
+          "owner": "Rihards.Capkovskis@biss.lv",
+          "creation": "2025-06-04 08:25:25.859753",
+          "modified": "2025-08-07 14:01:18.815464",
+          "modified_by": "Rihards.Capkovskis@biss.lv",
+          "docstatus": 0,
+          "idx": 0,
+          "status": "Open",
+          "priority": "Medium",
+          "date": "2025-08-11",
+          "allocated_to": "Rihards.Capkovskis@biss.lv",
+          "description": "<div class=\"ql-editor read-mode\"><p>Follow up on next atcions</p></div>",
+          "reference_type": "Leads",
+          "reference_name": "LEADS-000782",
+          "assigned_by": "Rihards.Capkovskis@biss.lv",
+          "assigned_by_full_name": "Rihards Čapkovskis",
+          "doctype": "ToDo"
+        }
+      },
+      {
+        "json": {
+          "name": "u2ptic0j6e",
+          "owner": "Rihards.Capkovskis@biss.lv",
+          "creation": "2025-04-02 14:00:37.734172",
+          "modified": "2025-08-07 09:55:12.641070",
+          "modified_by": "Rihards.Capkovskis@biss.lv",
+          "docstatus": 0,
+          "idx": 0,
+          "status": "Open",
+          "priority": "Low",
+          "date": "2025-08-14",
+          "allocated_to": "Rihards.Capkovskis@biss.lv",
+          "description": "<div class=\"ql-editor read-mode\"><p>Follow up on my message in whatsapp</p></div>",
+          "reference_type": "Leads",
+          "reference_name": "LEADS-001333",
+          "assigned_by": "Rihards.Capkovskis@biss.lv",
+          "assigned_by_full_name": "Rihards Čapkovskis",
+          "doctype": "ToDo"
+        }
+      },
+      {
+        "json": {
+          "name": "u3n8bhlgmm",
+          "owner": "Rihards.Capkovskis@biss.lv",
+          "creation": "2025-01-22 11:29:24.690751",
+          "modified": "2025-08-06 08:59:10.525198",
+          "modified_by": "Rihards.Capkovskis@biss.lv",
+          "docstatus": 0,
+          "idx": 0,
+          "status": "Open",
+          "priority": "Medium",
+          "date": "2025-08-13",
+          "allocated_to": "Rihards.Capkovskis@biss.lv",
+          "description": "<div class=\"ql-editor read-mode\"><p>Smart Directions Company have a meeting</p></div>",
+          "reference_type": "Leads",
+          "reference_name": " Smart Directions Company",
+          "assigned_by": "Rihards.Capkovskis@biss.lv",
+          "assigned_by_full_name": "Rihards Čapkovskis",
+          "doctype": "ToDo"
+        }
+      },
+      {
+        "json": {
+          "name": "ue09iembj7",
+          "owner": "Rihards.Capkovskis@biss.lv",
+          "creation": "2025-06-11 08:49:45.649118",
+          "modified": "2025-08-06 08:56:48.171050",
+          "modified_by": "Rihards.Capkovskis@biss.lv",
+          "docstatus": 0,
+          "idx": 0,
+          "status": "Open",
+          "priority": "Low",
+          "date": "2025-08-12",
+          "allocated_to": "Rihards.Capkovskis@biss.lv",
+          "description": "<div class=\"ql-editor read-mode\"><p>Follow up on progress with marketing and potenctial pilot project</p></div>",
+          "reference_type": "Leads",
+          "reference_name": "LEADS-001891",
+          "assigned_by": "Rihards.Capkovskis@biss.lv",
+          "assigned_by_full_name": "Rihards Čapkovskis",
+          "doctype": "ToDo"
+        }
+      },
+      {
+        "json": {
+          "name": "ufj5365n7e",
+          "owner": "Rihards.Capkovskis@biss.lv",
+          "creation": "2025-04-07 11:26:25.895046",
+          "modified": "2025-08-08 13:23:57.955975",
+          "modified_by": "Rihards.Capkovskis@biss.lv",
+          "docstatus": 0,
+          "idx": 0,
+          "status": "Open",
+          "priority": "Low",
+          "date": "2025-08-11",
+          "allocated_to": "Rihards.Capkovskis@biss.lv",
+          "description": "<div class=\"ql-editor read-mode\"><p>Smart Cities Solutions Company</p></div>",
+          "reference_type": "Leads",
+          "reference_name": "LEADS-001649",
+          "assigned_by": "Rihards.Capkovskis@biss.lv",
+          "assigned_by_full_name": "Rihards Čapkovskis",
+          "doctype": "ToDo"
+        }
+      },
+      {
+        "json": {
+          "name": "uft0spsgp3",
+          "owner": "Rihards.Capkovskis@biss.lv",
+          "creation": "2025-04-07 12:21:03.714180",
+          "modified": "2025-07-14 15:14:30.920749",
+          "modified_by": "Rihards.Capkovskis@biss.lv",
+          "docstatus": 0,
+          "idx": 0,
+          "status": "Open",
+          "priority": "Low",
+          "date": "2025-08-12",
+          "allocated_to": "Rihards.Capkovskis@biss.lv",
+          "description": "<div class=\"ql-editor read-mode\"><p>Adwaa Al Shugaa</p></div>",
+          "reference_type": "Leads",
+          "reference_name": "LEADS-001059",
+          "assigned_by": "Rihards.Capkovskis@biss.lv",
+          "assigned_by_full_name": "Rihards Čapkovskis",
+          "doctype": "ToDo"
+        }
+      },
+      {
+        "json": {
+          "name": "ulh5qc0rci",
+          "owner": "Rihards.Capkovskis@biss.lv",
+          "creation": "2025-08-04 14:27:13.733621",
+          "modified": "2025-08-04 14:51:13.328059",
+          "modified_by": "Rihards.Capkovskis@biss.lv",
+          "docstatus": 0,
+          "idx": 0,
+          "status": "Open",
+          "priority": "Low",
+          "date": "2025-08-12",
+          "allocated_to": "Rihards.Capkovskis@biss.lv",
+          "description": "<div class=\"ql-editor read-mode\"><p>Meeting in this date</p></div>",
+          "reference_type": "Leads",
+          "reference_name": "LEADS-001313",
+          "assigned_by": "Rihards.Capkovskis@biss.lv",
+          "assigned_by_full_name": "Rihards Čapkovskis",
+          "doctype": "ToDo"
+        }
+      },
+      {
+        "json": {
+          "name": "v1o3ddmndi",
+          "owner": "Rihards.Capkovskis@biss.lv",
+          "creation": "2025-08-04 10:49:25.675628",
+          "modified": "2025-08-05 13:56:44.340689",
+          "modified_by": "Rihards.Capkovskis@biss.lv",
+          "docstatus": 0,
+          "idx": 0,
+          "status": "Open",
+          "priority": "Low",
+          "date": "2025-08-12",
+          "allocated_to": "Rihards.Capkovskis@biss.lv",
+          "description": "<div class=\"ql-editor read-mode\"><p>Contact with Pinksecure about main questions and need they have for this project </p><p>+</p><p>Feadback from Alex regarding the need of paystation </p></div>",
+          "reference_type": "Regular Opportunity",
+          "reference_name": "REG-OPP-000633",
+          "assigned_by": "Rihards.Capkovskis@biss.lv",
+          "assigned_by_full_name": "Rihards Čapkovskis",
+          "doctype": "ToDo"
+        }
+      },
+      {
+        "json": {
+          "name": "v27co8bkql",
+          "owner": "Rihards.Capkovskis@biss.lv",
+          "creation": "2025-05-07 08:42:43.983781",
+          "modified": "2025-08-07 13:51:08.917990",
+          "modified_by": "Rihards.Capkovskis@biss.lv",
+          "docstatus": 0,
+          "idx": 0,
+          "status": "Open",
+          "priority": "Low",
+          "date": "2025-08-13",
+          "allocated_to": "Rihards.Capkovskis@biss.lv",
+          "description": "<div class=\"ql-editor read-mode\"><p>Follow up on the status of the project </p></div>",
+          "reference_type": "Regular Opportunity",
+          "reference_name": "REG-OPP-000472",
+          "assigned_by": "Rihards.Capkovskis@biss.lv",
+          "assigned_by_full_name": "Rihards Čapkovskis",
+          "doctype": "ToDo"
+        }
+      },
+      {
+        "json": {
+          "name": "vbgddqs4c1",
+          "owner": "Rihards.Capkovskis@biss.lv",
+          "creation": "2025-04-10 14:06:12.865272",
+          "modified": "2025-08-08 15:45:53.872109",
+          "modified_by": "Rihards.Capkovskis@biss.lv",
+          "docstatus": 0,
+          "idx": 0,
+          "status": "Open",
+          "priority": "Low",
+          "date": "2025-08-15",
+          "allocated_to": "Rihards.Capkovskis@biss.lv",
+          "description": "<div class=\"ql-editor read-mode\"><p>Kuwait Secure Security</p></div>",
+          "reference_type": "Leads",
+          "reference_name": "LEADS-001459",
+          "assigned_by": "Rihards.Capkovskis@biss.lv",
+          "assigned_by_full_name": "Rihards Čapkovskis",
+          "doctype": "ToDo"
+        }
+      },
+      {
+        "json": {
+          "name": "vd7it81fon",
+          "owner": "Rihards.Capkovskis@biss.lv",
+          "creation": "2025-05-22 15:32:29.552571",
+          "modified": "2025-06-03 08:16:56.361475",
+          "modified_by": "Rihards.Capkovskis@biss.lv",
+          "docstatus": 0,
+          "idx": 0,
+          "status": "Open",
+          "priority": "Low",
+          "date": "2025-08-11",
+          "allocated_to": "Rihards.Capkovskis@biss.lv",
+          "description": "<div class=\"ql-editor read-mode\"><p>SRACO COMPANY</p></div>",
+          "reference_type": "Leads",
+          "reference_name": "LEADS-000462",
+          "assigned_by": "Rihards.Capkovskis@biss.lv",
+          "assigned_by_full_name": "Rihards Čapkovskis",
+          "doctype": "ToDo"
+        }
+      },
+      {
+        "json": {
+          "name": "vhmk2nf42t",
+          "owner": "Rihards.Capkovskis@biss.lv",
+          "creation": "2024-12-10 10:22:32.397069",
+          "modified": "2025-08-04 15:35:05.124649",
+          "modified_by": "Rihards.Capkovskis@biss.lv",
+          "docstatus": 0,
+          "idx": 0,
+          "status": "Open",
+          "priority": "Medium",
+          "date": "2025-08-12",
+          "allocated_to": "Rihards.Capkovskis@biss.lv",
+          "description": "<div class=\"ql-editor read-mode\"><p>Follow up on Alisas leads </p></div>",
+          "reference_type": "Leads",
+          "reference_name": "LEADS-000809",
+          "assigned_by": "Rihards.Capkovskis@biss.lv",
+          "assigned_by_full_name": "Rihards Čapkovskis",
+          "doctype": "ToDo"
+        }
+      },
+      {
+        "json": {
+          "name": "vhqri3s2hh",
+          "owner": "Rihards.Capkovskis@biss.lv",
+          "creation": "2025-03-24 10:35:56.189503",
+          "modified": "2025-08-06 08:43:35.479190",
+          "modified_by": "Rihards.Capkovskis@biss.lv",
+          "docstatus": 0,
+          "idx": 0,
+          "status": "Open",
+          "priority": "Low",
+          "date": "2025-08-14",
+          "allocated_to": "Rihards.Capkovskis@biss.lv",
+          "description": "<div class=\"ql-editor read-mode\"><p>Getting contact with them </p></div>",
+          "reference_type": "Leads",
+          "reference_name": "Infosystems International EAD",
+          "assigned_by": "Rihards.Capkovskis@biss.lv",
+          "assigned_by_full_name": "Rihards Čapkovskis",
+          "doctype": "ToDo"
+        }
+      },
+      {
+        "json": {
+          "name": "virqem9k9u",
+          "owner": "Rihards.Capkovskis@biss.lv",
+          "creation": "2025-05-08 12:02:01.092495",
+          "modified": "2025-08-05 15:17:33.410055",
+          "modified_by": "Rihards.Capkovskis@biss.lv",
+          "docstatus": 0,
+          "idx": 0,
+          "status": "Open",
+          "priority": "Low",
+          "date": "2025-08-13",
+          "allocated_to": "Rihards.Capkovskis@biss.lv",
+          "description": "<div class=\"ql-editor read-mode\"><p>Follow up on my message in whatsapp</p></div>",
+          "reference_type": "Leads",
+          "reference_name": "LEADS-000659",
+          "assigned_by": "Rihards.Capkovskis@biss.lv",
+          "assigned_by_full_name": "Rihards Čapkovskis",
+          "doctype": "ToDo"
+        }
+      },
+      {
+        "json": {
+          "name": "vlg274a21c",
+          "owner": "Rihards.Capkovskis@biss.lv",
+          "creation": "2025-06-06 10:32:08.068788",
+          "modified": "2025-07-08 14:27:24.869424",
+          "modified_by": "Rihards.Capkovskis@biss.lv",
+          "docstatus": 0,
+          "idx": 0,
+          "status": "Open",
+          "priority": "Low",
+          "date": "2025-08-15",
+          "allocated_to": "Rihards.Capkovskis@biss.lv",
+          "description": "<div class=\"ql-editor read-mode\"><p>Follow up if there is response or no </p></div>",
+          "reference_type": "Leads",
+          "reference_name": "LEADS-001890",
+          "assigned_by": "Rihards.Capkovskis@biss.lv",
+          "assigned_by_full_name": "Rihards Čapkovskis",
+          "doctype": "ToDo"
+        }
+      },
+      {
+        "json": {
+          "name": "vqg5c2a419",
+          "owner": "Rihards.Capkovskis@biss.lv",
+          "creation": "2025-08-04 14:29:12.028593",
+          "modified": "2025-08-08 15:45:46.582152",
+          "modified_by": "Rihards.Capkovskis@biss.lv",
+          "docstatus": 0,
+          "idx": 0,
+          "status": "Open",
+          "priority": "Low",
+          "date": "2025-08-15",
+          "allocated_to": "Rihards.Capkovskis@biss.lv",
+          "description": "<div class=\"ql-editor read-mode\"><p>Follow up </p></div>",
+          "reference_type": "Leads",
+          "reference_name": "LEADS-001318",
+          "assigned_by": "Rihards.Capkovskis@biss.lv",
+          "assigned_by_full_name": "Rihards Čapkovskis",
+          "doctype": "ToDo"
+        }
+      }
+    ]
+  },
+  "connections": {
+    "Schedule Trigger": {
+      "main": [
+        [
+          {
+            "node": "Next Monday -> Next Friday",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Next Monday -> Next Friday": {
+      "main": [
+        [
+          {
+            "node": "Get many documents",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI E-mail Sender",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Aggregate": {
+      "main": [
+        [
+          {
+            "node": "Code1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get a document": {
+      "main": [
+        [
+          {
+            "node": "Aggregate",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "send_email": {
+      "ai_tool": [
+        [
+          {
+            "node": "AI E-mail Sender",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split Out": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code": {
+      "main": [
+        [
+          {
+            "node": "AI Title Generator",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Loop Over Items": {
+      "main": [
+        [],
+        [
+          {
+            "node": "Code",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI Chat Model1": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Title Generator",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Structured Output Parser": {
+      "ai_outputParser": [
+        [
+          {
+            "node": "AI Title Generator",
+            "type": "ai_outputParser",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare event": {
+      "main": [
+        [
+          {
+            "node": "Create an event",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge": {
+      "main": [
+        [
+          {
+            "node": "Prepare event",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create an event": {
+      "main": [
+        [
+          {
+            "node": "Wait",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get many documents": {
+      "main": [
+        [
+          {
+            "node": "Get a document",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Title Generator": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Code1": {
+      "main": [
+        [
+          {
+            "node": "AI E-mail Sender",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false
+  },
+  "versionId": "4e08739b-3a8f-483a-ba74-226391449699",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "70105cd159f1712be91b4c81e323ebe864d2013780db89b2c3ff3da04adb16fe"
+  },
+  "id": "LfAyQwTanU5pBASh",
+  "tags": []
+}
