@@ -1,0 +1,1082 @@
+{
+  "name": "Weekly sales planner v1.7",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 0 16 * * 5"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        -20448,
+        16912
+      ],
+      "id": "cfa11d1e-134b-4e40-a5b5-f92236558389",
+      "name": "Schedule Trigger"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Helper function to format date as YYYY-MM-DD in Riga timezone\nfunction formatDate(date) {\n  return date.toLocaleString('sv-SE', {\n    timeZone: 'Europe/Riga',\n    day: '2-digit',\n    month: '2-digit',\n    year: 'numeric',\n  }).split(' ')[0];\n}\n\n// Get current date in Riga timezone\nconst now = new Date(new Date().toLocaleString('en-US', { timeZone: 'Europe/Riga' }));\n\n// Find next Monday\nconst currentDay = now.getDay(); // 0 (Sun) to 6 (Sat)\nconst daysUntilNextMonday = ((8 - currentDay) % 7) || 7;\nconst nextMonday = new Date(now);\nnextMonday.setDate(now.getDate() + daysUntilNextMonday);\n\n// Next Friday after the found Monday\nconst nextFriday = new Date(nextMonday);\nnextFriday.setDate(nextMonday.getDate() + 4);\n\nreturn [{\n  nextMon: formatDate(nextMonday),\n  nextFri: formatDate(nextFriday)\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -20192,
+        16912
+      ],
+      "id": "b61cd9b7-b5bd-4395-9289-e3e2b8bd9dbf",
+      "name": "Next Monday -> Next Friday"
+    },
+    {
+      "parameters": {
+        "fieldToSplitOut": "data",
+        "include": "selectedOtherFields",
+        "fieldsToInclude": "name, status, date, allocated_to, description",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.splitOut",
+      "typeVersion": 1,
+      "position": [
+        -18656,
+        16576
+      ],
+      "id": "80534747-c3fb-4c8c-ac0a-a4c216996e24",
+      "name": "Split Out"
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        -18464,
+        16576
+      ],
+      "id": "5444fb9b-f10b-418d-86b3-c8db42fa1d25",
+      "name": "Loop Over Items",
+      "executeOnce": false
+    },
+    {
+      "parameters": {
+        "jsonSchemaExample": "{\n\t\"title\": \"Car Parking Control System - Ateco follow up on the status and feedback - https://erpnext.biss.lv/app/todo/0lbht1i143\"\n\t\n}"
+      },
+      "type": "@n8n/n8n-nodes-langchain.outputParserStructured",
+      "typeVersion": 1.3,
+      "position": [
+        -17776,
+        16848
+      ],
+      "id": "c5e90cd3-7503-497a-993f-e0786b8a4210",
+      "name": "Structured Output Parser"
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        -17488,
+        16608
+      ],
+      "id": "d062c4b3-4dd4-4824-a446-0a219e28b7b5",
+      "name": "Merge"
+    },
+    {
+      "parameters": {
+        "resource": "event",
+        "operation": "create",
+        "calendarId": {
+          "__rl": true,
+          "value": "AQMkADE4MWMwMjNmLWE3MGItNGE3Yi05MGQ3LTRlZjNlNTI3YzdiYwBGAAADH-465xBQvU_E32qZzpGSrAcAGSmuAt839EWeL23iy1n0rQAAAgEGAAAAGSmuAt839EWeL23iy1n0rQAAAp-OAAAA",
+          "mode": "list",
+          "cachedResultName": "Calendar"
+        },
+        "subject": "={{ $json.title }}",
+        "startDateTime": "={{ $json.start }}",
+        "endDateTime": "={{ $json.end }}",
+        "additionalFields": {
+          "body": "={{ $json.title }}"
+        }
+      },
+      "type": "n8n-nodes-base.microsoftOutlook",
+      "typeVersion": 2,
+      "position": [
+        -16912,
+        16608
+      ],
+      "id": "d5007fb5-f1aa-4ac9-9b01-cabac5085ce5",
+      "name": "Create an event",
+      "webhookId": "dc3d40c4-7639-4d98-aaad-8bd60459b959",
+      "retryOnFail": true,
+      "credentials": {
+        "microsoftOutlookOAuth2Api": {
+          "id": "2zMiILm1BsBP2NdN",
+          "name": "Microsoft Outlook account 2"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "amount": 1
+      },
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        -16736,
+        16608
+      ],
+      "id": "268aca52-62bd-4e08-8fb5-e0d7b22c2794",
+      "name": "Wait",
+      "webhookId": "26ec5ffa-7855-4203-b7ca-c8bae4ccef11"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=name: {{ $json.data.name }}\ndescription_clean: {{ $json.data.description_clean }}",
+        "hasOutputParser": true,
+        "options": {
+          "systemMessage": "Return a short, human-readable title from the provided sanitized text. \nRules: less than 15 words, make the title as understandable as possible.\nIf text is empty, use a generic action like \"Follow up task\".\nadd to the title \"- https://erpnext.biss.lv/app/todo/<name>\"\nRespond ONLY as JSON matching the required schema.\n"
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 2,
+      "position": [
+        -17920,
+        16656
+      ],
+      "id": "a6daa9dd-4b48-48df-ad44-d5c704a34327",
+      "name": "AI Title Generator",
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ JSON.stringify($json) }}\n",
+        "options": {
+          "systemMessage": "=ROLE\nYou are WeekPlannerBot. You receive ONE JSON object for a single salesperson’s next-week tasks.\n\nINPUT SHAPE\n{\n  \"weekTotal\": number,\n  \"days\": [\n    { \"label\": \"Monday\" | \"Tuesday\" | \"Wednesday\" | \"Thursday\" | \"Friday\",\n      \"date\": \"YYYY-MM-DD\", \"total\": number,\n      \"items\": [ { \"n\": number, \"name\": \"TODO-ID\", \"priority\": \"High|Medium|Low\", \"desc\": \"plain text\" } ]\n    }\n  ]\n}\n\n\nTASK\nCompose ONE HTML email using the provided counts and indices exactly as given.\n\nFor EACH item:\n- Create a TITLE from item.desc:\n  • 4–8 words (up to 12 if adding a company name), plain text, sentence case. Sentence case. No trailing punctuation, quotes, or emojis.\n  • Prefer verb + object (e.g., “Prepare pricing proposal”).\n  • If desc is empty, use “Follow up task”.\n  • Inject business name if present in desc:\n\n    • Detect names that look like organizations (e.g., tokens with legal suffixes: SIA, UAB, AS, LLC, Ltd, GmbH; or obvious brand/cap-case multiword names; or a domain like acme.com → “Acme”).\n\n    • Append to the TITLE as — {Org} (en dash). Example: Prepare pricing proposal — SIA BISS.\n\n    • Keep it short: use the shortest identifying form (drop “Ltd.” if space is tight).\n\nEmail structure (Outlook-safe HTML):\n1) Weekly total:\n   <p><strong>Total open tasks this week: [weekTotal]</strong></p>\n\n2) For each day (days[0]..days[4]):\n   <h3 style=\"margin:0 0 6px 0;\">[label], [MonthName DD, YYYY] — [total] tasks</h3>\n   If total == 0:\n     <p>— no tasks —</p>\n   If total > 0:\n     <ol start=\"1\" style=\"margin:0 0 14px 22px; padding:0;\">\n       For each item ascending by n:\n         <li style=\"margin:0 0 4px 0;\">\n           [TITLE] — [ [priority] ] —\n           <a href=\"https://erpnext.biss.lv/app/todo/[name]\">open</a>\n         </li>\n     </ol>\n   <div style=\"height:8px;\"></div>\n\nHARD RULES\n• Use weekTotal and each day.total exactly; do not recalc or reorder.\n��� If weekTotal == 0, still send a minimal “— no tasks —” email and finish.\n• Do not invent tasks or content not present in the input.\n\n"
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 2,
+      "position": [
+        -18512,
+        17568
+      ],
+      "id": "9c7da357-7585-40f5-adcd-c6b6430e8160",
+      "name": "AI E-mail Sender",
+      "retryOnFail": true,
+      "maxTries": 3,
+      "executeOnce": true
+    },
+    {
+      "parameters": {
+        "jsCode": "// Helpers\nconst strip = s => (s || '').replace(/<[^>]*>/g, ' ').replace(/\\s+/g, ' ').trim();\nconst fmt = d => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;\n\n// Input (KEEP name)\nconst tasks = ($json.data || []).map(t => ({\n  name: t.name,                // <-- needed for link\n  date: t.date,\n  priority: t.priority,\n  desc: strip(t.description).slice(0, 200)\n}));\n\nif (!tasks.length) return [{ json: { weekTotal: 0, days: [] } }];\n\n// Find Monday of that week\nconst minDateStr = tasks.map(t => t.date).sort()[0];\nconst base = new Date(`${minDateStr}T00:00:00`);\nconst dow = base.getDay();                 // 0 Sun..6 Sat\nbase.setDate(base.getDate() - ((dow + 6) % 7));\n\n// Build Mon→Fri skeleton\n/** @type {{label:string,date:string,total:number,items:Array<any>}[]} */\nconst days = ['Monday','Tuesday','Wednesday','Thursday','Friday'].map((label, i) => {\n  const d = new Date(base); d.setDate(base.getDate() + i);\n  return { label, date: fmt(d), total: 0, items: /** @type {any[]} */([]) };\n});\n\n// Group + pre-number\nfor (const t of tasks) {\n  const bucket = days.find(x => x.date === t.date);\n  if (!bucket) continue;\n  const n = bucket.items.length + 1;\n  bucket.items.push({\n    n,                    // numbering to print\n    name: t.name,         // <-- keep name\n    priority: t.priority,\n    desc: t.desc\n  });\n  bucket.total++;\n}\n\nreturn [{ json: { weekTotal: tasks.length, days } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -18784,
+        17568
+      ],
+      "id": "93941dbc-5fed-474c-a4ff-b8ac89197642",
+      "name": "Calculate Total Events + Normalize Data"
+    },
+    {
+      "parameters": {
+        "jsCode": "const strip = s => (s ?? '').replace(/<[^>]*>/g, ' ').replace(/\\s+/g, ' ').trim();\n\nconst d = $json.data || {};\nconst clean = strip(d.description).slice(0, 200);\n\nreturn [{\n  json: {\n    ...$json,\n    data: { ...d, description_clean: clean }\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -18144,
+        16592
+      ],
+      "id": "824442f5-98b4-40f3-bd21-72182e6f52cc",
+      "name": "Clean HTML from Description"
+    },
+    {
+      "parameters": {
+        "aggregate": "aggregateAllItemData",
+        "include": "specifiedFields",
+        "fieldsToInclude": "name, status, priority, date, allocated_to, description",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.aggregate",
+      "typeVersion": 1,
+      "position": [
+        -19056,
+        16912
+      ],
+      "id": "f9dfe19f-48d9-4132-95a0-99aa7f46ab06",
+      "name": "Aggregate ToDo Tasks"
+    },
+    {
+      "parameters": {
+        "operation": "getAll",
+        "docType": "={{ 'ToDo' }}",
+        "returnAll": true,
+        "options": {
+          "filters": {
+            "customProperty": [
+              {
+                "field": "=status",
+                "value": "Open"
+              },
+              {
+                "field": "=allocated_to",
+                "value": "="
+              },
+              {
+                "field": "=date",
+                "operator": "equalsGreater",
+                "value": "={{ $json.nextMon }}"
+              },
+              {
+                "field": "=date",
+                "operator": "equalsLess",
+                "value": "={{ $json.nextFri }}"
+              }
+            ]
+          }
+        }
+      },
+      "type": "n8n-nodes-base.erpNext",
+      "typeVersion": 1,
+      "position": [
+        -19680,
+        16912
+      ],
+      "id": "c7c5ed4b-9702-4e89-ab32-c084e780e594",
+      "name": "Get All ToDo Tasks Next Week",
+      "credentials": {
+        "erpNextApi": {
+          "id": "FKYgfWUfBEaUBaF5",
+          "name": "ERPNext BISS"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "docType": "={{ 'ToDo' }}",
+        "documentName": "={{ $json.name }}"
+      },
+      "type": "n8n-nodes-base.erpNext",
+      "typeVersion": 1,
+      "position": [
+        -19328,
+        16912
+      ],
+      "id": "d5b26879-75c0-4833-b687-ccbcd954d831",
+      "name": "Gather ToDo Task Information",
+      "credentials": {
+        "erpNextApi": {
+          "id": "FKYgfWUfBEaUBaF5",
+          "name": "ERPNext BISS"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// INIT RUN METRICS\n// Expects: $json.nextMon, $json.nextFri (YYYY-MM-DD)\n// Adds: $json._metrics with run_id, timestamps, week window, and counters.\n\nfunction uuid() {\n  try { return global.crypto.randomUUID(); }\n  catch { return `${Date.now()}-${Math.random().toString(16).slice(2)}`; }\n}\n\n// Format a timezone-local ISO-like string (no timezone suffix)\nfunction localISO(date, timeZone) {\n  const parts = new Intl.DateTimeFormat('sv-SE', {\n    timeZone,\n    hour12: false,\n    year: 'numeric', month: '2-digit', day: '2-digit',\n    hour: '2-digit', minute: '2-digit', second: '2-digit'\n  }).formatToParts(date).reduce((acc, p) => (acc[p.type] = p.value, acc), {});\n  return `${parts.year}-${parts.month}-${parts.day}T${parts.hour}:${parts.minute}:${parts.second}`;\n}\n\nconst tz = 'Europe/Riga';\nconst now = new Date();\n\nconst prev = $json._metrics || {};\nconst metrics = {\n  // identifiers\n  run_id: prev.run_id || uuid(),\n\n  // timing\n  tz,\n  start_ts: prev.start_ts || now.toISOString(),          // UTC\n  start_ts_riga: prev.start_ts_riga || localISO(now, tz),// Riga local clock (readable)\n\n  // reporting window\n  week_start: $json.nextMon,   // from previous node\n  week_end:   $json.nextFri,\n\n  // counters (initialized; may be incremented later)\n  failures: prev.failures ?? 0,\n  prompt_tokens: prev.prompt_tokens ?? 0,\n  completion_tokens: prev.completion_tokens ?? 0,\n  token_cost_eur: prev.token_cost_eur ?? 0\n};\n\n// pass through original payload + _metrics\nreturn [{ \n  ...$json,\n  _metrics: metrics\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -19920,
+        16912
+      ],
+      "id": "920982e8-9ca0-48ed-a492-fa1fd0363022",
+      "name": "INIT RUN METRICS"
+    },
+    {
+      "parameters": {
+        "jsCode": "// CAPTURE TASK COUNTS\n// Goal: emit one summary item with how many ERP tasks we have.\n// Works with either shape:\n//  A) Single aggregated item: { data: [ {name, ...}, ... ] }\n//  B) Many items (each is a ToDo): [{name,...}, {name,...}, ...]\n// Does NOT reference $node[…] or _metrics (to avoid context errors).\n\nfunction arrLen(x) { return Array.isArray(x) ? x.length : 0; }\n\nconst items = $items();   // all inbound items for this node\nlet count = 0;\n\nif (items.length === 1) {\n  // Typical after Aggregate: one item with .json.data = array\n  const j = items[0]?.json ?? {};\n  if (Array.isArray(j.data)) {\n    count = j.data.length;\n  } else {\n    // Fallback: if config changed and it's an array of items nested differently\n    count = arrLen(j.items);\n  }\n} else {\n  // If previous node produced many items (each representing a task)\n  count = items.length;\n}\n\n// Emit a single summary item. We'll merge this at the join hub.\nreturn [{\n  tasks_from_erpnext: count,\n  // Optional: keep a small diagnostic sample to help debug shape changes\n  _sample_first_item: (items[0]?.json && JSON.stringify(items[0].json).slice(0, 300)) || null\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -17696,
+        17408
+      ],
+      "id": "80fb6328-de7e-4dbf-a206-2db2476337f5",
+      "name": "CAPTURE TASK COUNTS"
+    },
+    {
+      "parameters": {
+        "jsCode": "// TITLE USAGE TAP — robust token accounting for per-item title/summary LLM\n// Placement: immediately after \"AI Title Generator\".\n// Settings: Run Once for All Items = ON\n\nfunction isNum(x){ return typeof x === 'number' && isFinite(x); }\n\n// Traverse any shape and collect usage\nfunction sumUsageDeep(root){\n  let prompt = 0, completion = 0, total = 0, found = false;\n  const stack = [root];\n\n  while (stack.length){\n    const cur = stack.pop();\n    if (!cur || typeof cur !== 'object') continue;\n\n    // Drill into common containers\n    if (cur.usage) stack.push(cur.usage);\n    if (cur.token_usage) stack.push(cur.token_usage);\n    if (cur.metrics) stack.push(cur.metrics);\n    if (Array.isArray(cur.choices)) for (const ch of cur.choices) stack.push(ch);\n    if (cur.response) stack.push(cur.response);\n\n    for (const [k, v] of Object.entries(cur)){\n      if (v && typeof v === 'object') stack.push(v);\n      if (!isNum(v)) continue;\n\n      const key = k.toLowerCase();\n\n      // Prompt/input side (OpenAI variants + cache fields)\n      if (key === 'prompt_tokens' || key === 'input_tokens' || key === 'request_tokens') {\n        prompt += v; found = true;\n      }\n      if (key === 'cache_creation_input_tokens' || key === 'prompt_cache_miss_tokens') {\n        prompt += v; found = true;\n      }\n      if (key === 'cache_read_input_tokens' || key === 'prompt_cache_hit_tokens') {\n        prompt += v; found = true;\n      }\n\n      // Completion/output side (OpenAI variants)\n      if (key === 'completion_tokens' || key === 'output_tokens' || key === 'response_tokens') {\n        completion += v; found = true;\n      }\n\n      // Aggregate total if exposed\n      if (key === 'total_tokens' || key === 'tokens_total') {\n        total += v; found = true;\n      }\n    }\n  }\n\n  // If we only have total + prompt, derive completion\n  if (found && completion === 0 && total > 0 && prompt > 0 && total >= prompt) {\n    completion = total - prompt;\n  }\n  // If we only have total (no prompt split), assume 60/40\n  if (found && completion === 0 && prompt === 0 && total > 0) {\n    prompt = Math.round(total * 0.60);\n    completion = total - prompt;\n  }\n  return { prompt, completion, found };\n}\n\n// ~4 chars ≈ 1 token (rough heuristic)\nconst approxTokens = (s) => Math.ceil(String(s || '').length / 4);\n\n// Pull model output text for fallback (title +/- summary)\nfunction extractGeneratedText(j){\n  let title = '', summary = '';\n  // Common placements used in your flow\n  if (j.output && typeof j.output === 'object') {\n    title = j.output.title || '';\n    summary = j.output.summary || '';\n  } else if (typeof j.output === 'string') {\n    try {\n      const p = JSON.parse(j.output);\n      if (p && typeof p === 'object') {\n        title = typeof p.title === 'string' ? p.title : '';\n        summary = typeof p.summary === 'string' ? p.summary : '';\n      } else {\n        title = j.output;\n      }\n    } catch {\n      title = j.output;\n    }\n  } else if (typeof j.title === 'string') {\n    title = j.title;\n  }\n  return (title + ' ' + summary).trim();\n}\n\n// Also include part of the original desc if you pass it to the model\nfunction extractDesc(j){\n  const d = j.data && typeof j.data.description_clean === 'string'\n    ? j.data.description_clean\n    : (j.data && typeof j.data.desc === 'string' ? j.data.desc : '');\n  return d || '';\n}\n\n// ---- ACCUMULATE OVER ALL ITEMS ----\nconst items = $items();\nlet sumPrompt = 0, sumCompletion = 0, usedEstimate = false, count = 0;\n\n// Fallback tunables\nconst BASE_PROMPT_OVERHEAD     = 500;   // baseline prompt context per item (adjust to your prompt)\nconst PROMPT_DESC_FRACTION     = 0.10;  // small share of desc counted on prompt side\nconst MIN_COMPLETION_PER_ITEM  = 1000;   // enforce a non-zero completion\nconst MIN_COMPLETION_FRACTION  = 0.10;  // completion must be at least 10% of total\nconst MIN_TOTAL_PER_ITEM       = 1200;  // clamp lower bound of total (p+c)\nconst MAX_TOTAL_PER_ITEM       = 2100;  // clamp upper bound of total\n\nfor (const it of items){\n  const j = it.json || {};\n  const { prompt, completion, found } = sumUsageDeep(j);\n\n  if (found){\n    let p = prompt;\n    let c = completion;\n\n    // Some runtimes report completion=0: derive from generated text as a floor\n    if (c === 0) {\n      const outText = extractGeneratedText(j);\n      const estC = Math.max(MIN_COMPLETION_PER_ITEM, approxTokens(outText));\n      c = Math.max(c, estC);\n    }\n\n    // Enforce completion fraction (helps when prompts are huge)\n    const totalNow = p + c;\n    const minC = Math.ceil(totalNow * MIN_COMPLETION_FRACTION);\n    if (c < minC) c = minC;\n\n    sumPrompt += p;\n    sumCompletion += c;\n    count++;\n    continue;\n  }\n\n  // ---- Fallback path: no usage found ----\n  usedEstimate = true; count++;\n\n  const outText = extractGeneratedText(j);   // title + optional summary\n  const desc    = extractDesc(j);\n\n  let p = BASE_PROMPT_OVERHEAD + Math.round(approxTokens(desc) * PROMPT_DESC_FRACTION);\n  let c = Math.max(MIN_COMPLETION_PER_ITEM, approxTokens(outText));\n\n  // Enforce completion share before clamping totals\n  const preTotal = p + c;\n  const minC = Math.ceil(preTotal * MIN_COMPLETION_FRACTION);\n  if (c < minC) c = minC;\n\n  // Clamp total and adjust prompt side first\n  let total = p + c;\n  if (total < MIN_TOTAL_PER_ITEM) {\n    p += (MIN_TOTAL_PER_ITEM - total);\n  } else if (total > MAX_TOTAL_PER_ITEM) {\n    const trim = total - MAX_TOTAL_PER_ITEM;\n    p = Math.max(1, p - trim);\n  }\n\n  sumPrompt += p;\n  sumCompletion += c;\n}\n\nreturn [{\n  title_prompt_tokens: sumPrompt,\n  title_completion_tokens: sumCompletion,\n  title_tokens_estimated: usedEstimate,\n  titles_count: count\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -17696,
+        17104
+      ],
+      "id": "f2ee98fd-3bd2-466e-94bf-d75e82df5de8",
+      "name": "TITLE USAGE TAP"
+    },
+    {
+      "parameters": {
+        "jsCode": "// COUNT EVENTS CREATED\n// Input: all items emitted by \"Create an event\" (one per event; failures may include an \"error\")\n// Output: single item with events_created (unique successful events)\n// Note: turn \"Run Once for All Items\" ON in this Code node's settings.\n\nconst all = $items();                    // all results from \"Create an event\"\nconst isOk = (it) => !it.json?.error;    // treat items with .json.error as failures (when Continue On Fail is used)\n\n// Try to extract a stable event identifier from typical Outlook responses\nconst getId = (j) => j?.id ?? j?.data?.id ?? j?.[\"@odata.id\"] ?? j?.[\"@odata.etag\"] ?? null;\n\nconst okItems = all.filter(isOk);\n\n// Deduplicate by id (if id missing, we still count the item as a success)\nconst ids = new Set();\nlet counted = 0;\nfor (const it of okItems) {\n  const id = getId(it.json);\n  if (id) {\n    if (!ids.has(id)) {\n      ids.add(id);\n      counted++;\n    }\n  } else {\n    counted++; // count successes with no explicit id once\n  }\n}\n\n// Optional diagnostics (useful in logs; harmless if unused downstream)\nconst failures = all.length - okItems.length;\n\nreturn [{\n  events_created: counted,         // <-- use this in your Weekly_Log\n  events_attempted: all.length,    // diagnostic\n  events_failed: failures          // diagnostic\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -17696,
+        17248
+      ],
+      "id": "eccadf33-c6e1-45b0-93f9-e4577cc0110b",
+      "name": "COUNT EVENTS CREATED"
+    },
+    {
+      "parameters": {
+        "jsCode": "// ==== Runtime + context ====\nconst m = $json._metrics || {};\nconst start = new Date(m.start_ts || new Date().toISOString());\nconst runtimeSec = Math.max(0, Math.round((Date.now() - start.getTime())/1000));\n\n// ==== Tasks included in the email ====\nconst tasksInEmail =\n  ($json.weekTotal != null ? Number($json.weekTotal) : null) ??\n  ($json.Tasks_In_Email != null ? Number($json.Tasks_In_Email) : null) ??\n  Number($json.tasks_from_erpnext || 0);\n\n// ==== TOKEN TOTALS (two buckets) ====\n// Titles (from TITLE USAGE TAP)\nconst tp_titles = Number($json.title_prompt_tokens || 0);\nconst tc_titles = Number($json.title_completion_tokens || 0);\n\n// Email (from metrics if captured; else estimated per task to keep logs stable)\nconst HAVE_EMAIL_USAGE = !!(m.email_prompt_tokens || m.email_completion_tokens);\nconst EMAIL_PROMPT_PER_TASK     = 130;   // <— keep/adjust baseline\nconst EMAIL_COMPLETION_PER_TASK = 117;   // <— keep/adjust baseline\n\nconst tp_email = HAVE_EMAIL_USAGE\n  ? Number(m.email_prompt_tokens || 0)\n  : tasksInEmail * EMAIL_PROMPT_PER_TASK;\n\nconst tc_email = HAVE_EMAIL_USAGE\n  ? Number(m.email_completion_tokens || 0)\n  : tasksInEmail * EMAIL_COMPLETION_PER_TASK;\n\n// ==== FX ====\nconst USD_TO_EUR = 0.93;  // <— set your FX\n\n// ==== PRICING (USD per 1M tokens) — set each model separately ====\n// a) Title generator (gpt-5-nano)\nconst USD_1M_IN_TITLES   = 0.050;   // <— FILL with your input price\nconst USD_1M_INC_TITLES  = 0.005;   // <— cached input (if you use caching); else keep small or = input\nconst USD_1M_OUT_TITLES  = 0.400;   // <— output price\n\n// b) Email composer (gpt-5)\nconst USD_1M_IN_EMAIL    = 1.250;   // <— your current input price\nconst USD_1M_INC_EMAIL   = 0.125;   // <— cached input\nconst USD_1M_OUT_EMAIL   = 10.000;  // <— output price\n\n// Caching share (0..1) per bucket (set to 0 if not using caching)\nconst CACHE_HIT_TITLES = 0.00;\nconst CACHE_HIT_EMAIL  = 0.00;\n\n// ---- helpers ----\nconst eurPer1k = (usdPer1M) => (usdPer1M * USD_TO_EUR) / 1000;\n\n// Effective input €/1k with caching mix\nconst EUR_IN_TITLES  = (1 - CACHE_HIT_TITLES) * eurPer1k(USD_1M_IN_TITLES)  + CACHE_HIT_TITLES * eurPer1k(USD_1M_INC_TITLES);\nconst EUR_IN_EMAIL   = (1 - CACHE_HIT_EMAIL)  * eurPer1k(USD_1M_IN_EMAIL)   + CACHE_HIT_EMAIL  * eurPer1k(USD_1M_INC_EMAIL);\nconst EUR_OUT_TITLES = eurPer1k(USD_1M_OUT_TITLES);\nconst EUR_OUT_EMAIL  = eurPer1k(USD_1M_OUT_EMAIL);\n\n// ==== COSTS per bucket ====\nconst costTitlesEUR = (tp_titles / 1000) * EUR_IN_TITLES  + (tc_titles / 1000) * EUR_OUT_TITLES;\nconst costEmailEUR  = (tp_email  / 1000) * EUR_IN_EMAIL   + (tc_email  / 1000) * EUR_OUT_EMAIL;\n\n// ==== TOTALS ====\nconst tp_total = tp_titles + tp_email;\nconst tc_total = tc_titles + tc_email;\nconst tokenCostEUR_Total = costTitlesEUR + costEmailEUR;\n\n// ==== OUTPUT ROW ====\nreturn [{\n  Week_Start: m.week_start,\n  Runs: 1,\n  Tasks_From_ERPNext: Number($json.tasks_from_erpnext || tasksInEmail || 0),\n  Tasks_In_Email: tasksInEmail,\n  Events_Created: Number($json.events_created || 0),\n  Failures: Number(m.failures || 0),\n  Runtime_sec: runtimeSec,\n  Actual_Send_Timestamp: m.email_sent_ts || new Date().toISOString(),\n\n  // Tokens by bucket\n  Title_Model: 'gpt-5-nano',    // <— optional label\n  Email_Model: 'gpt-5',         // <— optional label\n  Title_Prompt_Tokens: Math.round(tp_titles),\n  Title_Completion_Tokens: Math.round(tc_titles),\n  Email_Prompt_Tokens: Math.round(tp_email),\n  Email_Completion_Tokens: Math.round(tc_email),\n\n  // Totals\n  Prompt_Tokens_Total: Math.round(tp_total),\n  Completion_Tokens_Total: Math.round(tc_total),\n\n  // Costs by bucket\n  Title_Token_Cost_EUR: Number(costTitlesEUR.toFixed(4)),\n  Email_Token_Cost_EUR: Number(costEmailEUR.toFixed(4)),\n  Token_Cost_EUR_Total: Number(tokenCostEUR_Total.toFixed(4)),\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -16976,
+        17600
+      ],
+      "id": "c09e5595-ee29-483c-8f14-5b3f4db4fe3e",
+      "name": "BUILD WEEKLY_LOG ROW"
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "1jmwPsijowijqeIFCmy9MtlVXQ2_5-BDS5yDU0H9jp2c",
+          "mode": "list",
+          "cachedResultName": "SALES WEEKLY TASKS LOGS",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1jmwPsijowijqeIFCmy9MtlVXQ2_5-BDS5yDU0H9jp2c/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "Sheet1",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1jmwPsijowijqeIFCmy9MtlVXQ2_5-BDS5yDU0H9jp2c/edit#gid=0"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Runs": "={{ $json.Runs }}",
+            "Tasks from ERPNext": "={{ $json.Tasks_From_ERPNext }}",
+            "Tasks in email": "={{ $json.Tasks_In_Email }}",
+            "Events created": "={{ $json.Events_Created }}",
+            "Email sent timestamp": "={{ $json.Actual_Send_Timestamp }}",
+            "Completion Tokens": "={{ $json.Completion_Tokens_Total }}",
+            "Failures": "={{ $json.Failures }}",
+            "Runtime (in seconds)": "={{ $json.Runtime_sec }}",
+            "Prompt tokens": "={{ $json.Prompt_Tokens_Total }}",
+            "Estimated token cost EUR": "={{ $json.Token_Cost_EUR_Total }}",
+            "Week start date": "={{ $json.Week_Start }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "Week start date",
+              "displayName": "Week start date",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Runs",
+              "displayName": "Runs",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Tasks from ERPNext",
+              "displayName": "Tasks from ERPNext",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Tasks in email",
+              "displayName": "Tasks in email",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Events created",
+              "displayName": "Events created",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Failures",
+              "displayName": "Failures",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Runtime (in seconds)",
+              "displayName": "Runtime (in seconds)",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Email sent timestamp",
+              "displayName": "Email sent timestamp",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Prompt tokens",
+              "displayName": "Prompt tokens",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Completion Tokens",
+              "displayName": "Completion Tokens",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Estimated token cost EUR",
+              "displayName": "Estimated token cost EUR",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        -16688,
+        17600
+      ],
+      "id": "d063668c-11d8-4f8e-9889-86318f3b1756",
+      "name": "APPEND WEEKLY_LOG ROW",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "0JFjiBxFpHfuTTNE",
+          "name": "Maksims Locs"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "combineBy": "combineByPosition",
+        "numberInputs": 5,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        -17200,
+        17552
+      ],
+      "id": "b200c6ea-ea78-408c-bc6e-f403378f5ef9",
+      "name": "JOIN METRICS AND EVENT COUNT",
+      "executeOnce": true
+    },
+    {
+      "parameters": {
+        "jsCode": "// POST-EMAIL TIMESTAMP (empty-output friendly)\nconst primary = ($items()[0]?.json) || {};\nconst m = { ...(primary._metrics || {}) };\n\nm.email_sent_ts = new Date().toISOString();\nm.email_sent_ts_source = 'workflow_clock';\n\nreturn [{ ...primary, _metrics: m }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -17696,
+        17568
+      ],
+      "id": "6808674f-cf8b-40c7-ad8d-c56628fb0338",
+      "name": "POST E-MAIL TIMESTAMP"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Combine item 0 (data) and item 1 (output)\nconst arr = $items().map(i => i.json);\nconst task = (arr.find(i => i.data) || {}).data || {};\nlet out = (arr.find(i => i.output) || {}).output;\n\nif (typeof out === 'string') { try { out = JSON.parse(out); } catch {} }\n\nreturn [{\n  title: String(out?.title || '').trim(),\n  start: `${task.date}T04:00`,\n  end:   `${task.date}T04:15`\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -17200,
+        16608
+      ],
+      "id": "11c6b319-067d-41f6-92c8-5687bd2cf6b1",
+      "name": "Prepare Event Data for Outlook1"
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "value": "gpt-5-nano-2025-08-07",
+          "mode": "list",
+          "cachedResultName": "gpt-5-nano-2025-08-07"
+        },
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.2,
+      "position": [
+        -17936,
+        16848
+      ],
+      "id": "9a9ce53c-fd1e-42d8-97f8-43b54196743c",
+      "name": "gpt5nano250807",
+      "credentials": {
+        "openAiApi": {
+          "id": "DGMKhtjWiud3t6nI",
+          "name": "GPT_Credentials"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "subject": "=Weekly tasks: {{ $('Next Monday -> Next Friday').item.json.nextMon }} - {{ $('Next Monday -> Next Friday').item.json.nextFri }}",
+        "bodyContent": "={{ (() => {\n  let v = $('AI E-mail Sender').item.json.output;\n\n  // If the AI returned an object, take .Message; otherwise stringify-to-string\n  if (v && typeof v !== 'string') v = v.Message ?? JSON.stringify(v);\n  v = String(v ?? '');\n\n  return v\n    .replace(/^```(?:html)?|```$/g, '')          // strip code fences\n    .replace(/^\\s*{\\s*\"Message\"\\s*:\\s*\"|\"}\\s*$/g, '') // strip {\"Message\":\" ... \"}\n    .replace(/^\"|\"$/g, '')                       // stray wrapping quotes\n    .replace(/\\\\\"/g, '\"')                        // unescape quotes\n    .replace(/\\\\t/g, '')                         // remove \\t\n    .replace(/\\\\n\\s*/g, '')                      // remove \\n  (use '<br>' if you prefer line breaks)\n    .trim();\n})() }}",
+        "additionalFields": {
+          "bodyContentType": "html"
+        }
+      },
+      "type": "n8n-nodes-base.microsoftOutlook",
+      "typeVersion": 2,
+      "position": [
+        -18144,
+        17568
+      ],
+      "id": "63e047d9-8219-4dd3-89ef-6b91c876785a",
+      "name": "Send a message",
+      "webhookId": "fdd24d88-a30f-48dd-8ec6-f39e328dbe3e",
+      "credentials": {
+        "microsoftOutlookOAuth2Api": {
+          "id": "2zMiILm1BsBP2NdN",
+          "name": "Microsoft Outlook account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "value": "gpt-5-chat-latest",
+          "mode": "list",
+          "cachedResultName": "gpt-5-chat-latest"
+        },
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.2,
+      "position": [
+        -18512,
+        17728
+      ],
+      "id": "ff265837-7520-4346-b904-f8c1dd6a5fee",
+      "name": "gpt5chatlatest",
+      "notesInFlow": false,
+      "credentials": {
+        "openAiApi": {
+          "id": "DGMKhtjWiud3t6nI",
+          "name": "GPT_Credentials"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "content": "# Data gathering from ERPNext and Data Preparation",
+        "height": 1248,
+        "width": 1424,
+        "color": 6
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -20016,
+        16560
+      ],
+      "id": "5b00aa9b-dca6-4f3d-a434-ee4b0a9ae6d8",
+      "name": "Sticky Note2"
+    },
+    {
+      "parameters": {
+        "content": "",
+        "height": 176,
+        "width": 896,
+        "color": 6
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -18896,
+        16560
+      ],
+      "id": "61c45f83-dd8a-4160-90f9-de5f50437235",
+      "name": "Sticky Note3"
+    },
+    {
+      "parameters": {
+        "content": "# When and what week",
+        "height": 240,
+        "width": 480,
+        "color": 4
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -20544,
+        16832
+      ],
+      "id": "967d94e8-ba62-44ab-91d8-5ef6b8457c79",
+      "name": "Sticky Note11"
+    },
+    {
+      "parameters": {
+        "content": "## Logging Data",
+        "height": 240,
+        "width": 176,
+        "color": 3
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -19968,
+        16848
+      ],
+      "id": "795daa32-30eb-418a-88be-1e9d8d64e89b",
+      "name": "Sticky Note12"
+    },
+    {
+      "parameters": {
+        "content": "## Logging Data",
+        "height": 800,
+        "width": 1392,
+        "color": 3
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -17872,
+        17024
+      ],
+      "id": "02d6099d-2640-437c-8f65-5cf10eba6944",
+      "name": "Sticky Note13"
+    },
+    {
+      "parameters": {
+        "content": "# AI Weekly Plan E-Mail Sender",
+        "height": 416,
+        "width": 720,
+        "color": 5
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -18592,
+        17424
+      ],
+      "id": "5a5c182c-0536-40cf-98e7-4a1cbbcbd1fe",
+      "name": "Sticky Note14"
+    },
+    {
+      "parameters": {
+        "content": "# AI Task Event Creator",
+        "height": 416,
+        "width": 1488,
+        "color": 2
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -17984,
+        16560
+      ],
+      "id": "d3a0b56e-52b4-4598-9b42-bfe3baad863d",
+      "name": "Sticky Note15"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Schedule Trigger": {
+      "main": [
+        [
+          {
+            "node": "Next Monday -> Next Friday",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Next Monday -> Next Friday": {
+      "main": [
+        [
+          {
+            "node": "INIT RUN METRICS",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split Out": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Loop Over Items": {
+      "main": [
+        [
+          {
+            "node": "TITLE USAGE TAP",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "COUNT EVENTS CREATED",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Clean HTML from Description",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Structured Output Parser": {
+      "ai_outputParser": [
+        [
+          {
+            "node": "AI Title Generator",
+            "type": "ai_outputParser",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge": {
+      "main": [
+        [
+          {
+            "node": "Prepare Event Data for Outlook1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create an event": {
+      "main": [
+        [
+          {
+            "node": "Wait",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Title Generator": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Calculate Total Events + Normalize Data": {
+      "main": [
+        [
+          {
+            "node": "AI E-mail Sender",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Clean HTML from Description": {
+      "main": [
+        [
+          {
+            "node": "AI Title Generator",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Aggregate ToDo Tasks": {
+      "main": [
+        [
+          {
+            "node": "CAPTURE TASK COUNTS",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Calculate Total Events + Normalize Data",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Split Out",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get All ToDo Tasks Next Week": {
+      "main": [
+        [
+          {
+            "node": "Gather ToDo Task Information",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gather ToDo Task Information": {
+      "main": [
+        [
+          {
+            "node": "Aggregate ToDo Tasks",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI E-mail Sender": {
+      "main": [
+        [
+          {
+            "node": "Send a message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "COUNT EVENTS CREATED": {
+      "main": [
+        [
+          {
+            "node": "JOIN METRICS AND EVENT COUNT",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "INIT RUN METRICS": {
+      "main": [
+        [
+          {
+            "node": "Get All ToDo Tasks Next Week",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "JOIN METRICS AND EVENT COUNT",
+            "type": "main",
+            "index": 4
+          }
+        ]
+      ]
+    },
+    "CAPTURE TASK COUNTS": {
+      "main": [
+        [
+          {
+            "node": "JOIN METRICS AND EVENT COUNT",
+            "type": "main",
+            "index": 2
+          }
+        ]
+      ]
+    },
+    "BUILD WEEKLY_LOG ROW": {
+      "main": [
+        [
+          {
+            "node": "APPEND WEEKLY_LOG ROW",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "TITLE USAGE TAP": {
+      "main": [
+        [
+          {
+            "node": "JOIN METRICS AND EVENT COUNT",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "JOIN METRICS AND EVENT COUNT": {
+      "main": [
+        [
+          {
+            "node": "BUILD WEEKLY_LOG ROW",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "POST E-MAIL TIMESTAMP": {
+      "main": [
+        [
+          {
+            "node": "JOIN METRICS AND EVENT COUNT",
+            "type": "main",
+            "index": 3
+          }
+        ]
+      ]
+    },
+    "gpt5nano250807": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Title Generator",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Event Data for Outlook1": {
+      "main": [
+        [
+          {
+            "node": "Create an event",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send a message": {
+      "main": [
+        [
+          {
+            "node": "POST E-MAIL TIMESTAMP",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "gpt5chatlatest": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI E-mail Sender",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false
+  },
+  "versionId": "00a17f37-89fc-43e1-ab14-1b052dc886c8",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "70105cd159f1712be91b4c81e323ebe864d2013780db89b2c3ff3da04adb16fe"
+  },
+  "id": "LfAyQwTanU5pBASh",
+  "tags": []
+}
